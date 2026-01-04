@@ -1,0 +1,3 @@
+# OpenHarmony_Scrcpy
+
+OHScrcpy是一款为OpenHarmony系统设计的投屏工具软件，类似Android平台的scrcpy投屏工具。它能够将OpenHarmony设备的屏幕实时镜像到计算机，并提供设备控制功能。
