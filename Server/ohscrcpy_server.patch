@@ -1,0 +1,25 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 4b25940bd..262dfe386 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -18,5 +18,6 @@ group("media_packages") {
+   public_deps = [
+     "interfaces/inner_api/native:media_client",
+     "services:media_service",
++    "OHScrcpy_Server:ohscrcpy_server",
+   ]
+ }
+diff --git a/bundle.json b/bundle.json
+index bcea5acb3..c74f3cca8 100644
+--- a/bundle.json
++++ b/bundle.json
+@@ -140,7 +140,8 @@
+             "//foundation/multimedia/player_framework/interfaces/kits/js:napi_packages",
+             "//foundation/multimedia/player_framework/interfaces/kits/c:capi_packages",
+             "//foundation/multimedia/player_framework/interfaces/inner_api/native:media_client",
+-            "//foundation/multimedia/player_framework/frameworks/taihe:player_framework_taihe"
++            "//foundation/multimedia/player_framework/frameworks/taihe:player_framework_taihe",
++            "//foundation/multimedia/player_framework/OHScrcpy_Server:ohscrcpy_server"
+           ],
+           "service_group": [
+             "//foundation/multimedia/player_framework/services:media_services_package",
