@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-OHScrcpy 客户端
+OpenHarmony_Scrcpy 客户端
 """
 
 import sys
@@ -12,6 +12,7 @@ import queue
 import time
 import struct
 import gc
+import webbrowser
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Tuple, Callable
@@ -21,6 +22,8 @@ import numpy as np
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 
 # ==================== 常量定义 ====================
+AUTHOR = "luodh0157"
+PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
 VERSION = "v1.0"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
@@ -1088,7 +1091,7 @@ class OHScrcpyGUI:
     
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title(f"OHScrcpy - OpenHarmony投屏工具 {VERSION}")
+        self.root.title(f"OHScrcpy - OpenHarmony投屏工具 {VERSION}    （作者: {AUTHOR}）")
         self.root.geometry("1200x800")
         
         # 初始化组件
@@ -1133,6 +1136,95 @@ class OHScrcpyGUI:
         
         print(f"[{datetime.now().strftime('%H:%M:%S')}][GUI] 初始化完成")
     
+    def open_project_url(self, event=None):
+        """打开项目地址"""
+        webbrowser.open(PROJECT_URL)
+    
+    def show_about_dialog(self):
+        """显示关于对话框"""
+        about_window = tk.Toplevel(self.root)
+        about_window.title("关于 OHScrcpy")
+        about_window.resizable(False, False)
+        
+        about_window.transient(self.root)
+        # 居中计算
+        root_x = self.root.winfo_rootx()
+        root_y = self.root.winfo_rooty()
+        root_w = self.root.winfo_width()
+        root_h = self.root.winfo_height()
+        win_w = 420
+        win_h = 260
+        x = root_x + (root_w - win_w) // 2
+        y = root_y + (root_h - win_h) // 2
+        about_window.geometry(f"{win_w}x{win_h}+{x}+{y}")
+
+        # 主容器（使用 pack 布局）
+        main_frame = tk.Frame(about_window, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 软件名称
+        app_name_label = tk.Label(
+            main_frame,
+            text="OHScrcpy - OpenHarmony投屏工具",
+            font=("Microsoft YaHei", 12, "bold"),
+            anchor="center"
+        )
+        app_name_label.pack(pady=(0, 15))
+
+        content_frame = tk.Frame(main_frame)
+        content_frame.pack(fill=tk.X, anchor="w")
+
+        # 版本信息
+        version_label = tk.Label(
+            content_frame,
+            text=f"版本: {VERSION}",
+            font=("Microsoft YaHei", 10),
+            anchor="w"
+        )
+        version_label.pack(anchor="w", padx=10, pady=2)
+
+        # 作者
+        author_label = tk.Label(
+            content_frame,
+            text=f"作者: {AUTHOR}",
+            font=("Microsoft YaHei", 10),
+            anchor="w"
+        )
+        author_label.pack(anchor="w", padx=10, pady=2)
+
+        # 项目地址
+        project_label = tk.Label(
+            content_frame,
+            text="项目地址:",
+            font=("Microsoft YaHei", 10),
+            anchor="w"
+        )
+        project_label.pack(anchor="w", padx=10, pady=2)
+
+        # 项目地址超链接
+        url_label = tk.Label(
+            content_frame,
+            text=PROJECT_URL,
+            font=("Microsoft YaHei", 10),
+            fg="blue",
+            cursor="hand2",
+            anchor="w",
+            justify="left"
+        )
+        url_label.pack(anchor="w", padx=10, pady=2)
+        url_label.bind("<Button-1>", self.open_project_url)
+
+        # 关闭按钮
+        close_button = tk.Button(
+            main_frame,
+            text="关闭",
+            command=about_window.destroy,
+            font=("Microsoft YaHei", 9),
+            width=10
+        )
+        close_button.pack(pady=(20, 0))
+        close_button.focus_set()
+    
     def setup_ui(self):
         """设置UI"""
         # 标题栏
@@ -1140,15 +1232,32 @@ class OHScrcpyGUI:
         title_frame.pack(fill=tk.X)
         title_frame.pack_propagate(False)
         
-        tk.Label(title_frame, text="OHScrcpy - OpenHarmony投屏工具", 
-                font=("Microsoft YaHei", 12), fg="white", bg="#2c3e50"
-                ).pack(side=tk.LEFT, padx=10, pady=5)
+        # 左侧：应用标题和作者信息
+        left_frame = tk.Frame(title_frame, bg="#2c3e50")
+        left_frame.pack(side=tk.LEFT, padx=10, pady=5)
+        
+        # 应用标题
+        app_title_label = tk.Label(left_frame, text="OHScrcpy - OpenHarmony投屏工具", 
+                                  font=("Microsoft YaHei", 12), fg="white", bg="#2c3e50")
+        app_title_label.pack(side=tk.LEFT)
+        
+        # 右侧：设备状态和关于按钮
+        right_frame = tk.Frame(title_frame, bg="#2c3e50")
+        right_frame.pack(side=tk.RIGHT, padx=10, pady=5)
+        
+        # 关于按钮 - 与标题栏同色
+        about_button = tk.Button(right_frame, text="关于", 
+                                font=("Microsoft YaHei", 9), 
+                                bg="#2c3e50", fg="white",
+                                relief=tk.FLAT, width=6,
+                                command=self.show_about_dialog)
+        about_button.pack(side=tk.RIGHT, padx=(10, 0))
         
         self.device_status_label = tk.Label(
-            title_frame, text="设备: 未连接", font=("Microsoft YaHei", 9),
+            right_frame, text="设备: 未连接", font=("Microsoft YaHei", 9),
             fg="#ecf0f1", bg="#2c3e50"
         )
-        self.device_status_label.pack(side=tk.RIGHT, padx=10, pady=5)
+        self.device_status_label.pack(side=tk.RIGHT, padx=(0, 10))
         
         # 主内容区
         main_frame = tk.Frame(self.root)
@@ -1731,9 +1840,9 @@ class OHScrcpyGUI:
 
 # ==================== 主程序入口 ====================
 def main():
-    print("="*60)
-    print(" "*18, "OHScrcpy 客户端 - ", VERSION, " "*18)
-    print("="*60)
+    print("="*70)
+    print(" "*18, "OpenHarmony_Scrcpy 客户端 -", VERSION, " "*18)
+    print("="*70)
     
     # 检查依赖
     try:

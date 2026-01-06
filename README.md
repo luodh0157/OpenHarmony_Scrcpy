@@ -42,15 +42,19 @@
 OpenHarmony_Scrcpy/
 ├── Client/              # 客户端目录
 ├──── ohscrcpy_client.py # 客户端程序入口
+├──── README.md  # 客户端说明文档
 ├── Server/                       # 服务端目录
 ├──── bin/                        # 预置二进制可执行文件目录
 ├──── BUILD.gn                    # 服务端在OpenHarmony系统下的编译配置脚本
-├──── install_ohscrcpy_server.bat # 服务端安装脚本
 ├──── build_ohscrcpy_server.sh    # 服务端编译脚本
+├──── install_ohscrcpy_server.bat # 服务端安装脚本（Windows）
+├──── install_ohscrcpy_server.sh  # 服务端安装脚本（Linux）
 ├──── ohscrcpy_server.cfg         # 服务端在OpenHarmony系统下的运行权限配置
 ├──── ohscrcpy_server.cpp         # 服务端实现源码
-├──── start_ohscrcpy_server.bat   # 服务端启动脚本
-├── image.png   # 系统原理框图
+├──── ohscrcpy_server.patch       # 服务端嵌入编译配置补丁
+├──── README.md                   # 服务端说明文档
+├──── start_ohscrcpy_server.bat   # 服务端启动脚本（Windows）
+├──── start_ohscrcpy_server.sh    # 服务端启动脚本（Linux）
 ├── LICENSE    # LICENSE说明
 └── README.md  # 说明文档
 ```
@@ -85,7 +89,7 @@ OpenHarmony_Scrcpy/
    ```
    2. 在**foundation/multimedia/player_framework/**目录下新建**OHScrcpy_Server**目录
    3. 将本项目**Server**目录中的**BUILD.gn ohscrcpy_server.cpp ohscrcpy_server.cfg**拷贝至上一步新建的**OHScrcpy_Server**目录下
-   4. 将本项目**Server**目录中的**ohscrcpy_server.patch**拷贝至**foundation/multimedia/player_framework/**目录下
+   4. 将本项目**Server**目录中的**ohscrcpy_server.patch**拷贝至<strong>foundation/multimedia/player_framework/</strong>目录下
    5. 在**foundation/multimedia/player_framework/**目录下执行**git apply ohscrcpy_server.patch**，打上编译配置补丁
    6. 在OpenHarmony全仓代码的根目录下，执行如下编译命令：
    ```bash
@@ -129,7 +133,7 @@ pip install numpy pillow av
       - 确保设备和计算机在同一局域网或者用网线将设备和计算机直连
 
 ### 2. 启动OpenHarmony设备侧服务
-   执行**Server**目录下的**start_ohscrcpy_server**脚本即可完成安装，Windows平台使用**start_ohscrcpy_server.bat**，Linux平台使用**start_ohscrcpy_server.sh**
+   执行**Server**目录下的**start_ohscrcpy_server**脚本即可启动，Windows平台使用**start_ohscrcpy_server.bat**，Linux平台使用**start_ohscrcpy_server.sh**
 
 ### 3. 启动计算机端GUI程序
 ```bash
@@ -137,7 +141,7 @@ python ohscrcpy_client.py
 ```
    1. 运行程序后，主界面将显示
    2. 点击**刷新**按钮扫描可用设备
-   3. 从设备列表中选择要连接的设备
+   3. 从**设备列表**中选择要连接的设备
    4. 点击**连接**按钮开始投屏
 
 ![alt text](./Client/客户端启动GUI.png)
@@ -154,8 +158,8 @@ python ohscrcpy_client.py
 - **电源键**：点击**电源**按钮
 - **主页键**：点击**主页**按钮
 - **返回键**：点击**返回**按钮
-- **音量+**：点击**音量+**按钮
-- **音量-**：点击**音量-**按钮
+- **音量+**：点击<strong>音量+</strong>按钮
+- **音量-**：点击<strong>音量-</strong>按钮
 
 ### 5. 快捷键
 

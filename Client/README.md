@@ -64,7 +64,7 @@ pip install numpy pillow av
       - 确保设备和计算机在同一局域网或者用网线将设备和计算机直连
 
 ### 2. 启动服务端
-   执行**Server**目录下的**start_ohscrcpy_server**脚本即可完成安装，Windows平台使用**start_ohscrcpy_server.bat**，Linux平台使用**start_ohscrcpy_server.sh**
+   执行**Server**目录下的**start_ohscrcpy_server**脚本即可启动，Windows平台使用**start_ohscrcpy_server.bat**，Linux平台使用**start_ohscrcpy_server.sh**
 
 ### 3. 启动客户端GUI程序
 ```bash
@@ -72,7 +72,7 @@ python ohscrcpy_client.py
 ```
    1. 运行程序后，主界面将显示
    2. 点击**刷新**按钮扫描可用设备
-   3. 从设备列表中选择要连接的设备
+   3. 从**设备列表**中选择要连接的设备
    4. 点击**连接**按钮开始投屏
 
 ![alt text](客户端启动GUI.png)
@@ -89,8 +89,8 @@ python ohscrcpy_client.py
 - **电源键**：点击**电源**按钮
 - **主页键**：点击**主页**按钮
 - **返回键**：点击**返回**按钮
-- **音量+**：点击**音量+**按钮
-- **音量-**：点击**音量-**按钮
+- **音量+**：点击<strong>音量+</strong>按钮
+- **音量-**：点击<strong>音量-</strong>按钮
 
 ### 5. 快捷键
 

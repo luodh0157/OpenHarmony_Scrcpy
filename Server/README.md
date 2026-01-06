@@ -33,7 +33,7 @@
    ```
    2. 在**foundation/multimedia/player_framework/**目录下新建**OHScrcpy_Server**目录
    3. 将本项目**Server**目录中的**BUILD.gn ohscrcpy_server.cpp ohscrcpy_server.cfg**拷贝至上一步新建的**OHScrcpy_Server**目录下
-   4. 将本项目**Server**目录中的**ohscrcpy_server.patch** 拷贝至 **foundation/multimedia/player_framework/**目录下
+   4. 将本项目**Server**目录中的**ohscrcpy_server.patch** 拷贝至 <strong>foundation/multimedia/player_framework/</strong>目录下
    5. 在**foundation/multimedia/player_framework/**目录下执行**git apply ohscrcpy_server.patch**，打上编译配置补丁
    6. 在OpenHarmony全仓代码的根目录下，执行如下编译命令：
    ```bash
@@ -48,7 +48,7 @@
       （说明：非**rk3568**芯片平台，需要修改**install_ohscrcpy_server**脚本中的路径，当然也可以共用同一个路径）
 
 ### 启动方法
-   执行**Server**目录下的**start_ohscrcpy_server**脚本即可完成安装，Windows平台使用**start_ohscrcpy_server.bat**，Linux平台使用**start_ohscrcpy_server.sh**
+   执行**Server**目录下的**start_ohscrcpy_server**脚本即可启动，Windows平台使用**start_ohscrcpy_server.bat**，Linux平台使用**start_ohscrcpy_server.sh**
 
 ## 免责声明
 本工具仅供学习和研究使用，请勿用于非法用途。使用本工具造成的任何后果，开发者概不负责。
