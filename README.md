@@ -10,13 +10,14 @@
 
 ## 特性
 
-- 🖥️ **实时屏幕镜像**：低延迟显示OpenHarmony设备屏幕
-- 🎯 **设备控制**：支持点击、滑动、按键等操作
-- 🔌 **多种连接方式**：支持USB连接和网络连接
-- 📱 **多设备管理**：支持同时连接多个设备并切换
-- 🎨 **自适应分辨率**：自动调整显示尺寸，保持原始比例
-- 📊 **性能监控**：实时显示FPS、网络状态等统计信息
-- 🛠️ **调试功能**：内置调试工具，便于问题排查
+- **实时屏幕镜像**：低延迟显示OpenHarmony设备屏幕
+- **设备控制**：支持点击、滑动、按键等操作
+- **多种连接方式**：支持USB连接和网络连接
+- **多设备管理**：支持同时连接多个设备并切换
+- **自适应分辨率**：自动调整显示尺寸，保持原始比例
+- **性能监控**：实时显示FPS、网络状态等统计信息
+- **调试功能**：内置调试工具，便于问题排查
+- **服务自动安装和启动**：服务端自动安装和启动
 
 ## 系统要求
 
@@ -100,10 +101,7 @@ OpenHarmony_Scrcpy/
 ## 安装步骤
 
 ### OpenHarmony设备侧安装
-   1. 将编译产物**ohscrcpy_server**拷贝至本项目**Server/bin/**目录下对应的芯片平台子目录**rk3568**下
-      （说明：本项目已自带rockchip rk3568芯片平台的编译产物，如果芯片平台和OpenHarmony系统版本一致，可跳过**编译步骤**和当前步骤）
-   2. 执行**Server**目录下的**install_ohscrcpy_server**脚本即可完成安装，Windows平台使用**install_ohscrcpy_server.bat**，Linux平台使用**install_ohscrcpy_server.sh**
-      （说明：非**rk3568**芯片平台，需要修改**install_ohscrcpy_server**脚本中的路径，当然也可以共用同一个路径）
+   无需手动安装，客户端（计算机侧）发起投屏时会自动安装服务端（OpenHarmony设备侧）
 
 ### 计算机侧安装
 
@@ -133,7 +131,7 @@ pip install numpy pillow av
       - 确保设备和计算机在同一局域网或者用网线将设备和计算机直连
 
 ### 2. 启动OpenHarmony设备侧服务
-   执行**Server**目录下的**start_ohscrcpy_server**脚本即可启动，Windows平台使用**start_ohscrcpy_server.bat**，Linux平台使用**start_ohscrcpy_server.sh**
+   无需手动启动，客户端（计算机侧）发起投屏时会自动拉起服务端（OpenHarmony设备侧）
 
 ### 3. 启动计算机端GUI程序
 ```bash

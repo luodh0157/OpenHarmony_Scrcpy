@@ -24,7 +24,7 @@ from PIL import Image, ImageTk, ImageDraw, ImageFont
 # ==================== 常量定义 ====================
 AUTHOR = "luodh0157"
 PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
-VERSION = "v1.0"
+VERSION = "v1.1"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
 HEARTBEAT_TIMEOUT = 5.0  # 心跳超时时间（秒）
@@ -64,6 +64,7 @@ class HDCCommandExecutor:
     def __init__(self, device_sn: Optional[str] = None):
         self.device_sn = device_sn
         self.hdc_path = self._find_hdc_path()
+        self.async_processes = {}  # 存储异步进程
     
     def _find_hdc_path(self) -> str:
         """查找hdc工具路径"""
@@ -119,6 +120,70 @@ class HDCCommandExecutor:
         except Exception as e:
             return {"success": False, "error": str(e)}
     
+    def execute_async(self, args: List[str]) -> Optional[subprocess.Popen]:
+        """异步执行命令（用于启动持续运行的服务）"""
+        cmd = [self.hdc_path]
+        
+        if self.device_sn:
+            cmd.extend(["-t", self.device_sn])
+        
+        cmd.extend(args)
+        
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding='utf-8',
+                errors='ignore'
+            )
+            
+            # 保存进程引用，以便后续管理
+            process_id = len(self.async_processes)
+            self.async_processes[process_id] = process
+            
+            # 启动一个线程来监控进程输出
+            threading.Thread(
+                target=self._monitor_async_process,
+                args=(process_id, process),
+                daemon=True
+            ).start()
+            
+            return process
+        except Exception as e:
+            print(f"异步执行命令失败: {e}")
+            return None
+    
+    def _monitor_async_process(self, process_id: int, process: subprocess.Popen):
+        """监控异步进程的输出"""
+        try:
+            stdout, stderr = process.communicate()
+            print(f"[异步进程 {process_id}] 输出: {stdout}")
+            if stderr:
+                print(f"[异步进程 {process_id}] 错误: {stderr}")
+        except Exception as e:
+            print(f"[异步进程 {process_id}] 监控异常: {e}")
+        finally:
+            # 移除已结束的进程
+            if process_id in self.async_processes:
+                del self.async_processes[process_id]
+    
+    def stop_async_processes(self):
+        """停止所有异步进程"""
+        for process_id, process in list(self.async_processes.items()):
+            try:
+                process.terminate()
+                process.wait(timeout=3)
+            except:
+                try:
+                    process.kill()
+                except:
+                    pass
+            finally:
+                if process_id in self.async_processes:
+                    del self.async_processes[process_id]
+    
     def set_device(self, device_sn: str) -> None:
         """设置当前设备"""
         self.device_sn = device_sn
@@ -126,6 +191,188 @@ class HDCCommandExecutor:
     def get_hdc_info(self) -> Dict[str, Any]:
         """获取HDC信息"""
         return self.execute(["--version"], timeout=2.0)
+    
+    def check_file_exists(self, remote_path: str) -> bool:
+        """检查远程文件是否存在"""
+        result = self.execute(["shell", "ls", remote_path])
+        return result["success"] and "No such file or directory" not in result["stdout"]
+
+
+# ==================== 服务端管理器 ====================
+class ServerManager:
+    """服务端管理器"""
+    
+    def __init__(self, hdc_executor: HDCCommandExecutor):
+        self.hdc = hdc_executor
+        self.server_process = None
+    
+    def install_server(self) -> bool:
+        """安装服务端"""
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 开始安装...")
+        
+        # 1. 检查文件是否存在
+        if not os.path.exists("ohscrcpy_server"):
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 错误: ohscrcpy_server 文件不存在")
+            return False
+        
+        if not os.path.exists("ohscrcpy_server.cfg"):
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 错误: ohscrcpy_server.cfg 文件不存在")
+            return False
+        
+        # 2. 重新挂载系统为读写模式
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 挂载系统为读写模式...")
+        result = self.hdc.execute(["shell", "mount", "-o", "rw,remount", "/"])
+        if not result["success"]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 挂载失败: {result.get('stderr', '未知错误')}")
+        
+        # 3. 推送可执行文件
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 推送可执行文件...")
+        result = self.hdc.execute(["file", "send", "ohscrcpy_server", "/system/bin/"])
+        if not result["success"]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 推送 ohscrcpy_server 失败: {result.get('stderr', '未知错误')}")
+            return False
+        
+        # 4. 设置可执行权限
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 设置可执行权限...")
+        result = self.hdc.execute(["shell", "chmod", "+x", "/system/bin/ohscrcpy_server"])
+        if not result["success"]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 设置可执行权限失败: {result.get('stderr', '未知错误')}")
+            return False
+        
+        # 5. 推送配置文件
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 推送配置文件...")
+        result = self.hdc.execute(["file", "send", "ohscrcpy_server.cfg", "/system/etc/init/"])
+        if not result["success"]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 推送 ohscrcpy_server.cfg 失败: {result.get('stderr', '未知错误')}")
+            return False
+        
+        # 6. 准备设备环境
+        self.prepare_server()
+        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 安装完成")
+        return True
+
+    def uninstall_server(self) -> bool:
+        """卸载服务端"""
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 开始卸载...")
+        
+        # 停止运行的服务
+        self.stop_server()
+        
+        # 1. 删除可执行文件
+        result = self.hdc.execute(["shell", "rm", "-f", "/system/bin/ohscrcpy_server"])
+        if not result["success"]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 删除 ohscrcpy_server 失败: {result.get('stderr', '未知错误')}")
+        
+        # 2. 删除配置文件
+        result = self.hdc.execute(["shell", "rm", "-f", "/system/etc/init/ohscrcpy_server.cfg"])
+        if not result["success"]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 删除 ohscrcpy_server.cfg 失败: {result.get('stderr', '未知错误')}")
+        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 卸载完成")
+        return True
+    
+    def start_server(self) -> bool:
+        """启动服务端"""
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 开始启动...")
+        
+        # 检查服务是否已安装
+        if not self.check_server_installed():
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 服务未安装，请先安装服务")
+            return False
+        
+        # 准备设备环境
+        self.prepare_server()
+        
+        # 启动服务（异步执行）
+        self.server_process = self.hdc.execute_async(["shell", "/system/bin/ohscrcpy_server"])
+        
+        if self.server_process:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 启动命令已执行")
+            # 等待片刻检查服务是否启动成功
+            time.sleep(0.5)
+            if self.check_server_running():
+                print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 启动成功")
+                return True
+            else:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 可能启动失败")
+                return False
+        else:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 启动失败")
+            return False
+    
+    def stop_server(self) -> bool:
+        """停止服务端"""
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 开始停止...")
+        
+        # 停止本地异步进程
+        if self.server_process:
+            try:
+                self.server_process.terminate()
+                self.server_process.wait(timeout=3)
+                print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 服务进程已停止")
+            except:
+                try:
+                    self.server_process.kill()
+                except:
+                    pass
+            finally:
+                self.server_process = None
+        
+        # 在设备上终止服务进程
+        result = self.hdc.execute(["shell", "pkill", "-f", "ohscrcpy_server"])
+        
+        # 如果pkill失败，尝试使用killall
+        if not result["success"]:
+            result = self.hdc.execute(["shell", "killall", "ohscrcpy_server"])
+        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 停止完成")
+        return True
+    
+    def check_server_installed(self) -> bool:
+        """检查服务端是否已安装"""
+        # 检查可执行文件
+        executable_exists = self.hdc.check_file_exists("/system/bin/ohscrcpy_server")
+        
+        # 检查配置文件
+        config_exists = self.hdc.check_file_exists("/system/etc/init/ohscrcpy_server.cfg")
+        
+        if executable_exists and config_exists:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 服务已安装")
+            return True
+        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 服务未安装")
+        return False
+    
+    def check_server_running(self) -> bool:
+        """检查服务端是否在运行"""
+        result = self.hdc.execute(["shell", "pgrep", "-f", "ohscrcpy_server"])
+        
+        if result["success"] and result["stdout"]:
+            pid = result["stdout"].strip()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 服务正在运行，PID: {pid}")
+            return True
+        else:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 服务未运行")
+            return False
+    
+    def prepare_server(self) -> bool:
+        """准备服务端（唤醒设备等）"""
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 准备环境...")
+        
+        # 1. 唤醒设备
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 唤醒设备...")
+        result = self.hdc.execute(["shell", "power-shell", "wakeup"])
+        if not result["success"]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 唤醒设备失败，继续执行...")
+        
+        # 2. 设置显示模式
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 设置屏幕常亮...")
+        result = self.hdc.execute(["shell", "power-shell", "setmode", "602"])
+        if not result["success"]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][服务端管理器] 设置屏幕常亮失败，继续执行...")
+        
+        return True
 
 # ==================== 设备管理器 ====================
 class DeviceManager:
@@ -135,7 +382,8 @@ class DeviceManager:
         self.hdc = hdc_executor
         self.devices: List[DeviceInfo] = []
         self.current_device: Optional[DeviceInfo] = None
-    
+        self.server_manager = ServerManager(self.hdc)
+        
     def discover_devices(self) -> List[DeviceInfo]:
         """发现可用设备"""
         result = self.hdc.execute(["list", "targets"])
@@ -179,10 +427,10 @@ class DeviceManager:
         cmd.append(param)
         result = self.hdc.execute(cmd)
         if not result["success"]:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}][设备管理器] 获取系统属性 [{param}] 失败")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}][设备管理器] 获取系统属性: [{param}] 失败")
             return ""
         ret = result["stdout"].strip()
-        print(f"[{datetime.now().strftime('%H:%M:%S')}][设备管理器] 获取系统属性 [{param}], 结果：{ret}")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}][设备管理器] 获取系统属性: [{param}], 结果: [{ret}]")
         return ret
     
     def select_device(self, serial: str) -> bool:
@@ -214,6 +462,30 @@ class DeviceManager:
             print(f"[{datetime.now().strftime('%H:%M:%S')}][设备管理器] 端口转发失败: {result.get('error', '未知错误')}")
         
         return result["success"]
+    
+    def install_server(self) -> bool:
+        """安装服务端"""
+        return self.server_manager.install_server()
+    
+    def uninstall_server(self) -> bool:
+        """卸载服务端"""
+        return self.server_manager.uninstall_server()
+    
+    def start_server(self) -> bool:
+        """启动服务端"""
+        return self.server_manager.start_server()
+    
+    def stop_server(self) -> bool:
+        """停止服务端"""
+        return self.server_manager.stop_server()
+        
+    def check_server_installed(self) -> bool:
+        """检查服务端是否已安装"""
+        return self.server_manager.check_server_installed()
+        
+    def check_server_running(self) -> bool:
+        """检查服务端是否在运行"""
+        return self.server_manager.check_server_running()
 
 # ==================== H.264解码器 ====================
 class H264Decoder:
@@ -1310,10 +1582,8 @@ class OHScrcpyGUI:
     
     def create_device_panel(self, parent):
         """创建设备面板"""
-        frame = tk.LabelFrame(parent, text="设备控制", font=("Microsoft YaHei", 10))
+        frame = tk.LabelFrame(parent, text="设备选择", font=("Microsoft YaHei", 10))
         frame.pack(fill=tk.X, padx=5, pady=(0, 5))
-        
-        tk.Label(frame, text="选择设备:", font=("Microsoft YaHei", 9)).pack(anchor=tk.W, padx=10, pady=(10, 5))
         
         self.device_var = tk.StringVar()
         self.device_combo = ttk.Combobox(frame, textvariable=self.device_var, state="readonly")
@@ -1624,6 +1894,34 @@ class OHScrcpyGUI:
         self.update_status(f"正在连接设备: {device.serial}...")
         
         try:
+            # 1. 检查服务端是否已安装
+            self.update_status("检查服务端安装状态...")
+            if not self.device_manager.check_server_installed():
+                self.update_status("服务端未安装，开始安装...")
+                
+                # 安装服务端
+                if not self.device_manager.install_server():
+                    messagebox.showerror("错误", "服务端安装失败！")
+                    self.update_status("服务端安装失败")
+                    return
+            else:
+                self.update_status("服务端已安装")
+            
+            # 2. 检查服务端是否在运行
+            self.update_status("检查服务端运行状态...")
+            if not self.device_manager.check_server_running():
+                self.update_status("启动服务端...")
+                if not self.device_manager.start_server():
+                    messagebox.showerror("错误", f"服务端启动失败！")
+                    self.update_status("服务端启动失败")
+                    return
+                
+                # 等待服务端完全启动
+                self.update_status("等待服务端就绪...")
+                time.sleep(0.5)
+            else:
+                self.update_status("服务端已在运行")
+            
             # 端口转发
             self.update_status("设置端口转发...")
             if not self.device_manager.setup_port_forwarding(DEFAULT_PORT, DEFAULT_PORT):
