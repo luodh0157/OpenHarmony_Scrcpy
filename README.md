@@ -6,7 +6,6 @@
 - **计算机侧（客户端）**：基于Python跨平台实现
 - **OpenHarmony设备侧（服务端）**：基于OpenHarmony系统C-API实现
 
-![alt text](系统架构图.png)
 
 ## 特性
 
