@@ -88,15 +88,15 @@ OpenHarmony_Scrcpy/
    repo init -u git@gitcode.com:openharmony/manifest.git -b master --no-repo-verify
    repo sync -c --no-tags -j`nproc`
    ```
-   2. 在**foundation/multimedia/player_framework/**目录下新建**OHScrcpy_Server**目录
-   3. 将本项目**Server**目录中的**BUILD.gn ohscrcpy_server.cpp ohscrcpy_server.cfg**拷贝至上一步新建的**OHScrcpy_Server**目录下
-   4. 将本项目**Server**目录中的**ohscrcpy_server.patch**拷贝至<strong>foundation/multimedia/player_framework/</strong>目录下
-   5. 在**foundation/multimedia/player_framework/**目录下执行**git apply ohscrcpy_server.patch**，打上编译配置补丁
+   2. 在`foundation/multimedia/player_framework/`目录下新建`OHScrcpy_Server`目录
+   3. 将本项目`Server`目录中的`BUILD.gn ohscrcpy_server.cpp ohscrcpy_server.cfg`拷贝至上一步新建的`OHScrcpy_Server`目录下
+   4. 将本项目`Server`目录中的`ohscrcpy_server.patch`拷贝至`foundation/multimedia/player_framework/`目录下
+   5. 在`foundation/multimedia/player_framework/`目录下执行`git apply ohscrcpy_server.patch`，打上编译配置补丁
    6. 在OpenHarmony全仓代码的根目录下，执行如下编译命令：
    ```bash
    ./build.sh --product-name rk3568 --build-target ohscrcpy_server
    ```
-   7. 编译产物位于**out/rk3568/multimedia/player_framework/**目录下的**ohscrcpy_server**
+   7. 编译产物位于`out/rk3568/multimedia/player_framework/`目录下的`ohscrcpy_server`
 
 ## 安装步骤
 
@@ -138,9 +138,9 @@ pip install numpy pillow av
 python ohscrcpy_client.py
 ```
    1. 运行程序后，主界面将显示
-   2. 点击**刷新**按钮扫描可用设备
-   3. 从**设备列表**中选择要连接的设备
-   4. 点击**连接**按钮开始投屏
+   2. 点击`刷新`按钮扫描可用设备
+   3. 从`设备列表`中选择要连接的设备
+   4. 点击`连接`按钮开始投屏
 
 ![alt text](./Client/客户端启动GUI.png)
 ![alt text](./Client/客户端投屏GUI.png)
@@ -148,16 +148,16 @@ python ohscrcpy_client.py
 ### 4. 基本操作
 
 #### 屏幕控制
-- **点击**：在视频区域**单击鼠标左键**
-- **滑动**：在视频区域**按住鼠标左键并拖动**
+- **点击**：在视频区域`单击鼠标左键`
+- **滑动**：在视频区域`按住鼠标左键并拖动`
 - **缩放**：程序自动适应窗口大小，保持原始比例
 
 #### 按键控制
-- **电源键**：点击**电源**按钮
-- **主页键**：点击**主页**按钮
-- **返回键**：点击**返回**按钮
-- **音量+**：点击<strong>音量+</strong>按钮
-- **音量-**：点击<strong>音量-</strong>按钮
+- **电源键**：点击`电源`按钮
+- **主页键**：点击`主页`按钮
+- **返回键**：点击`返回`按钮
+- **音量+**：点击`音量+`按钮
+- **音量-**：点击`音量-`按钮
 
 ### 5. 快捷键
 
@@ -173,7 +173,7 @@ python ohscrcpy_client.py
 ### 视频流配置
    程序默认使用以下配置：
 - **分辨率**：设备原始分辨率
-- **帧率**：30 FPS
+- **帧率**：30 fps
 - **码率**：1.5 Mbps
 - **编码格式**：H.264
 
@@ -193,7 +193,7 @@ python ohscrcpy_client.py
 - 运行 `hdc list targets` 检查设备识别情况
 
 #### 2. 连接失败
-- 检查默认端口**27183**是否被占用
+- 检查默认端口`27183`是否被占用
 - 确保设备端服务端程序已运行
 - 检查防火墙设置
 
@@ -204,7 +204,7 @@ python ohscrcpy_client.py
 
 #### 4. 解码错误
 - 确保已安装所有Python依赖
-- 检查**PyAV**库是否正确安装
+- 检查`PyAV`库是否正确安装
 - 尝试重启程序
 
 ### 调试模式
@@ -244,7 +244,7 @@ self.video_client = VideoStreamClient(on_frame_decoded=self._on_frame_decoded, d
 
 ## 支持与反馈
 
-- 问题反馈：[GitCode Issues](https://gitcode.com/luodh0157/OpenHarmony_Scrcpy/issues)
+- 问题反馈：[OpenHarmony_Scrcpy Issues](https://gitcode.com/luodh0157/OpenHarmony_Scrcpy/issues)
 - 功能建议：通过Issue提交
 - 技术支持：查看Wiki文档或联系开发者
 
