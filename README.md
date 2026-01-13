@@ -219,15 +219,6 @@ self.video_client = VideoStreamClient(on_frame_decoded=self._on_frame_decoded, d
 2. **数据安全**：视频流仅在本地网络传输
 3. **隐私保护**：不记录或传输敏感信息
 
-## 版本历史
-
-### v1.0 (当前版本)
-- 初始版本发布
-- 支持基本屏幕镜像功能
-- 支持设备控制（点击、滑动、按键）
-- 图形用户界面
-- 多设备管理
-
 ## 贡献指南
 
 欢迎提交Issue和Pull Request来改进本项目：
