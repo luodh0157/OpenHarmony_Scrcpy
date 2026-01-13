@@ -1,5 +1,5 @@
 /**
- * OHScrcpy 服务端实现 - 基于OpenHarmony API
+ * OHScrcpy 服务端实现 - 基于OpenHarmony C-API
  */
 
 #include <iostream>
@@ -8,6 +8,7 @@
 #include <memory>
 #include <vector>
 #include <cstring>
+#include <charconv>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -20,7 +21,7 @@
 #include <condition_variable>
 #include <getopt.h>
 
-// OpenHarmony多媒体API头文件
+// OpenHarmony多媒体C-API头文件
 #include <native_avscreen_capture.h>
 #include <native_avscreen_capture_base.h>
 #include <native_avscreen_capture_errors.h>
@@ -54,7 +55,7 @@
 #define PACKET_TYPE_CONFIG_DATA    0x00000006
 
 // 版本信息
-#define VERSION "v1.0"
+#define VERSION "v1.2"
 
 // H.264 NALU类型
 enum H264NaluType {
@@ -95,6 +96,12 @@ struct CommandLineArgs {
     int32_t bitrate = DEFAULT_BITRATE;
     bool show_help = false;
     bool show_version = false;
+};
+
+// 视频流消息包头
+struct VideoPacketHeader {
+    int32_t packet_type;
+    int32_t packet_size;
 };
 
 // 网络传输类
@@ -255,12 +262,11 @@ public:
             std::cout << "Send packet: type=" << type_name << ", size=" << size << " bytes" << std::endl;
         }
 
-        // 发送数据包格式：4字节类型 + 4字节长度 + 数据
-        uint32_t net_type = htonl(packet_type);
-        uint32_t net_size = htonl(size);
-
-        if (!sendData(&net_type, sizeof(net_type))) return false;
-        if (!sendData(&net_size, sizeof(net_size))) return false;
+        VideoPacketHeader header = {
+            .packet_type = htonl(packet_type),
+            .packet_size = htonl(size)
+        };
+        if (!sendData(&header, sizeof(header))) return false;
         if (!sendData(data, size)) return false;
         
         return true;
@@ -278,12 +284,12 @@ public:
     }
     
     bool sendConfig(const ScreenInfo& info) {
-        std::string config_str = "SCREEN_INFO:" + 
+        std::string config_str = "SCREEN_INFO:" +
             std::to_string(info.width) + ":" +
             std::to_string(info.height) + ":" +
             std::to_string(info.fps) + ":" +
             std::to_string(info.bitrate) + ":" +
-            info.codec + "\n";
+            info.codec +  "\n";
 
         bool succ = sendData(config_str.c_str(), config_str.length());
         if (succ) {
@@ -306,17 +312,26 @@ public:
             
             if (received > 0) {
                 buffer[received] = '\0';
-                if (strstr(buffer, "CONFIG_ACK") != nullptr) {
+                if (parseConfigAck(buffer, received)) {
                     return true;
                 }
             } else if (received < 0 && errno != EWOULDBLOCK && errno != EAGAIN) {
+                std::cerr << "receiveAck fail, received:" << received << " errno:" << errno << std::endl;
                 break;
             }
-            
-            usleep(10000);  // 10ms
+            usleep(5000);  // 5ms
         }
         
         return false;
+    }
+
+    bool parseConfigAck(char *buffer, size_t size) {
+        char *cfg_ack = strstr(buffer, "CONFIG_ACK");
+        if (cfg_ack == nullptr) {
+            std::cerr << "invalid ACK: no include CONFIG_ACK" << std::endl;
+            return false;
+        }
+        return true;
     }
     
     void sendHeartbeat() {
@@ -1292,7 +1307,7 @@ private:
             // 3. 检查并接受新客户端连接
             if (!network_.hasClient()) {
                 network_.acceptClient();
-                usleep(100000); // 100ms
+                usleep(10000); // 10ms
                 continue;
             }
             
@@ -1391,9 +1406,9 @@ void print_usage(const char* program_name) {
 
 // 打印版本信息
 void print_version() {
-    std::cout << "======================================================" << std::endl;
-    std::cout << "          OHScrcpy Server " << VERSION << " (author: LDH)          " << std::endl;
-    std::cout << "======================================================" << std::endl;
+    std::cout << "====================================================================" << std::endl;
+    std::cout << "        OpenHarmony_Scrcpy Server - " << VERSION << " (author: luodh0157)        " << std::endl;
+    std::cout << "====================================================================" << std::endl;
 }
 
 // 解析命令行参数
