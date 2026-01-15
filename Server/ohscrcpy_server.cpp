@@ -1141,18 +1141,14 @@ public:
         cleanup();
     }
 
-    bool getPrimaryScreenInfo(ScreenInfo &info) {
-        auto display = OHOS::Rosen::DisplayManager::GetInstance().GetDefaultDisplay();
-        if (display == nullptr) {
-            std::cerr << "DisplayManager::GetDefaultDisplay fail" << std::endl;
-            return false;
-        }
-        
-        info.width = display->GetWidth();
-        info.height = display->GetHeight();
-        info.fps = DEFAULT_FPS;
-        info.bitrate = DEFAULT_BITRATE;
-        info.codec = "h264";
+    bool initCmdArgsFromDevice(CommandLineArgs& args) {
+        ScreenInfo screenInfo;
+        getPrimaryScreenInfo(screenInfo);
+
+        args.width = screenInfo.width;
+        args.height = screenInfo.height;
+        args.framerate = screenInfo.fps;
+        args.bitrate = screenInfo.bitrate;
         return true;
     }
     
@@ -1174,6 +1170,21 @@ private:
         std::cout << "Configuration info: " << screen_info_.width << "x" << screen_info_.height 
                   << "@" << screen_info_.fps << "fps" << " bitrate:" << screen_info_.bitrate 
                   << " " << screen_info_.codec << std::endl;
+        return true;
+    }
+
+    bool getPrimaryScreenInfo(ScreenInfo &info) {
+        auto display = OHOS::Rosen::DisplayManager::GetInstance().GetDefaultDisplay();
+        if (display == nullptr) {
+            std::cerr << "DisplayManager::GetDefaultDisplay fail" << std::endl;
+            return false;
+        }
+        
+        info.width = display->GetWidth();
+        info.height = display->GetHeight();
+        info.fps = DEFAULT_FPS;
+        info.bitrate = DEFAULT_BITRATE;
+        info.codec = "h264";
         return true;
     }
 
@@ -1405,7 +1416,7 @@ void print_version() {
 }
 
 // 解析命令行参数
-void parse_arguments(int argc, char* argv[], CommandLineArgs& args, ScreenInfo &actualInfo) {
+void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
     // 定义长选项
     static struct option long_options[] = {
         {"port", required_argument, 0, 'p'},
@@ -1420,46 +1431,52 @@ void parse_arguments(int argc, char* argv[], CommandLineArgs& args, ScreenInfo &
     
     int opt;
     int option_index = 0;
+    int param = 0;
     
     while ((opt = getopt_long(argc, argv, "p:w:h:f:b:V:H:?", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'p':
-                args.port = std::atoi(optarg);
-                if (args.port <= 0 || args.port > 65535) {
-                    std::cerr << "Invalid port: " << optarg << ", use default " << DEFAULT_PORT << std::endl;
-                    args.port = DEFAULT_PORT;
+                param = std::atoi(optarg);
+                if (param <= 0 || param > 65535) {
+                    std::cerr << "Invalid port: " << optarg << ", use default " << args.port << std::endl;
+                } else {
+                    args.port = param;
                 }
                 break;
                 
             case 'w':
-                args.width = std::atoi(optarg);
-                if (args.width <= 0) {
-                    std::cerr << "Invalid width: " << optarg << ", use actual " << actualInfo.width << std::endl;
-                    args.width = actualInfo.width;
+                param = std::atoi(optarg);
+                if (param <= 0) {
+                    std::cerr << "Invalid width: " << optarg << ", use actual " << args.width << std::endl;
+                } else {
+                    args.width = param;
                 }
                 break;
                 
             case 'h':
-                args.height = std::atoi(optarg);
-                if (args.height <= 0) {
-                    std::cerr << "Invalid height: " << optarg << ", use actual " << actualInfo.height << std::endl;
-                    args.height = actualInfo.height;
+                param = std::atoi(optarg);
+                if (param <= 0) {
+                    std::cerr << "Invalid height: " << optarg << ", use actual " << args.height << std::endl;
+                } else {
+                    args.height = param;
                 }
                 break;
                 
             case 'f':
-                args.framerate = std::atoi(optarg);
-                if (args.framerate <= 0) {
-                    std::cerr << "Invalid framerate: " << optarg << ", use actual " << actualInfo.fps << std::endl;
-                    args.framerate = actualInfo.fps;
+                param = std::atoi(optarg);
+                if (param <= 0) {
+                    std::cerr << "Invalid framerate: " << optarg << ", use actual " << args.framerate << std::endl;
+                } else {
+                    args.framerate = param;
                 }
                 break;
                 
             case 'b':
-                args.bitrate = std::atoi(optarg);
-                if (args.bitrate <= 0) {
-                    std::cerr << "Invalid bitrate: " << optarg << ", use actual " << actualInfo.bitrate << std::endl;
-                    args.bitrate = actualInfo.bitrate;
+                param = std::atoi(optarg);
+                if (param <= 0) {
+                    std::cerr << "Invalid bitrate: " << optarg << ", use actual " << args.bitrate << std::endl;
+                } else {
+                    args.bitrate = param;
                 }
                 break;
                 
@@ -1485,13 +1502,12 @@ int main(int argc, char* argv[]) {
     print_version();
 
     // 获取设备屏幕信息
-    ScreenInfo screenInfo;
+    CommandLineArgs args;
     OHScrcpyServer server;
-    server.getPrimaryScreenInfo(screenInfo);
+    server.initCmdArgsFromDevice(args);
 
     // 解析命令行参数
-    CommandLineArgs args;
-    parse_arguments(argc, argv, args, screenInfo);
+    parse_arguments(argc, argv, args);
     if (args.show_help) {
         print_usage(argv[0]);
         return 0;
