@@ -26,7 +26,7 @@ from PIL import Image, ImageTk, ImageDraw, ImageFont
 # ==================== 常量定义 ====================
 AUTHOR = "luodh0157"
 PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
-VERSION = "v1.2"
+VERSION = "v1.3"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
 HEARTBEAT_TIMEOUT = 5.0  # 心跳超时时间（秒）
@@ -1575,6 +1575,7 @@ class OHScrcpyGUI:
         # 设置UI
         self.setup_ui()
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.root.bind('<Configure>', self.on_window_resize)
         
         print_log(LogLevel.INFO, self.log_title, f"初始化完成")
     
@@ -2271,27 +2272,27 @@ class OHScrcpyGUI:
     def power_key(self):
         if self.is_connected and self.device_controller:
             self.device_controller.power_key()
-            print_log(self.log_title, f"发送电源键")
+            print_log(LogLevel.INFO, self.log_title, f"发送电源键")
     
     def home_key(self):
         if self.is_connected and self.device_controller:
             self.device_controller.home_key()
-            print_log(self.log_title, f"发送Home键")
+            print_log(LogLevel.INFO, self.log_title, f"发送Home键")
     
     def back_key(self):
         if self.is_connected and self.device_controller:
             self.device_controller.back_key()
-            print_log(self.log_title, f"发送返回键")
+            print_log(LogLevel.INFO, self.log_title, f"发送返回键")
     
     def volume_up(self):
         if self.is_connected and self.device_controller:
             self.device_controller.volume_up()
-            print_log(self.log_title, f"发送音量+")
+            print_log(LogLevel.INFO, self.log_title, f"发送音量+")
     
     def volume_down(self):
         if self.is_connected and self.device_controller:
             self.device_controller.volume_down()
-            print_log(self.log_title, f"发送音量-")
+            print_log(LogLevel.INFO, self.log_title, f"发送音量-")
     
     def _print_debug_info(self):
         """打印调试信息"""
@@ -2402,6 +2403,11 @@ class OHScrcpyGUI:
                 self.root.destroy()
         else:
             self.root.destroy()
+    
+    def on_window_resize(self, event):
+        print_log(LogLevel.DEBUG, self.log_title, f"窗口大小变化: {event.width}x{event.height}")
+        # 触发重新计算视频缩放率和显示区域
+        self.video_ratio = 0.0
     
     def run(self):
         self.root.mainloop()

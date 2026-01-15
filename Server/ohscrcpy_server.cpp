@@ -55,7 +55,7 @@
 #define PACKET_TYPE_CONFIG_DATA    0x00000006
 
 // 版本信息
-#define VERSION "v1.2"
+#define VERSION "v1.3"
 
 // H.264 NALU类型
 enum H264NaluType {
@@ -1120,11 +1120,11 @@ class OHScrcpyServer {
 public:
     OHScrcpyServer() : port_(DEFAULT_PORT), screen_info_{} {}
     
-    bool start(const CommandLineArgs& args, bool isUserCfg = false) {
+    bool start(const CommandLineArgs& args) {
         // 设置端口
         port_ = args.port;
         
-        if (!initialize(args, isUserCfg)) {
+        if (!initialize(args)) {
             std::cerr << "OHScrcpyServer initialize fail" << std::endl;
             return false;
         }
@@ -1140,42 +1140,11 @@ public:
         g_streaming = false;
         cleanup();
     }
-    
-private:
-    bool initialize(const CommandLineArgs& args, bool isUserCfg = false) {
-        std::cout << "Initializing modules..." << std::endl;
-        // 1. 初始化网络模块
-        if (!network_.initialize(port_)) {
-            std::cerr << "Initialize network module fail" << std::endl;
-            return false;
-        }
-
-        // 2. 设置屏幕显示信息
-        if (!isUserCfg) {
-            getPrimaryScreenInfo(screen_info_);
-        } else {
-            screen_info_.width = args.width;
-            screen_info_.height = args.height;
-            screen_info_.fps = args.framerate;
-            screen_info_.bitrate = args.bitrate;
-        }
-
-        std::cout << "Configuration info: " << screen_info_.width << "x" 
-                  << screen_info_.height << "@" << screen_info_.fps << "fps" 
-                  << " bitrate:" << screen_info_.bitrate << std::endl;
-        return true;
-    }
 
     bool getPrimaryScreenInfo(ScreenInfo &info) {
         auto display = OHOS::Rosen::DisplayManager::GetInstance().GetDefaultDisplay();
         if (display == nullptr) {
             std::cerr << "DisplayManager::GetDefaultDisplay fail" << std::endl;
-            // 使用默认值
-            info.width = DEFAULT_WIDTH;
-            info.height = DEFAULT_HEIGHT;
-            info.fps = DEFAULT_FPS;
-            info.bitrate = DEFAULT_BITRATE;
-            info.codec = "h264";
             return false;
         }
         
@@ -1184,6 +1153,27 @@ private:
         info.fps = DEFAULT_FPS;
         info.bitrate = DEFAULT_BITRATE;
         info.codec = "h264";
+        return true;
+    }
+    
+private:
+    bool initialize(const CommandLineArgs& args) {
+        std::cout << "Initializing modules..." << std::endl;
+        // 1. 初始化网络模块
+        if (!network_.initialize(port_)) {
+            std::cerr << "Initialize network module fail" << std::endl;
+            return false;
+        }
+
+        // 2. 设置屏幕显示信息
+        screen_info_.width = args.width;
+        screen_info_.height = args.height;
+        screen_info_.fps = args.framerate;
+        screen_info_.bitrate = args.bitrate;
+
+        std::cout << "Configuration info: " << screen_info_.width << "x" << screen_info_.height 
+                  << "@" << screen_info_.fps << "fps" << " bitrate:" << screen_info_.bitrate 
+                  << " " << screen_info_.codec << std::endl;
         return true;
     }
 
@@ -1196,8 +1186,11 @@ private:
 
         std::cout << "------------------------------------------------------" << std::endl;
         std::cout << "PrimaryDisplayDetailsInfo: " << std::endl;
-        std::cout << "  RefreshRate: " << display->GetRefreshRate()
-                  << " ,Rotation: " << static_cast<int32_t>(display->GetRotation()) << std::endl;
+        std::cout << "  id: " << display->GetId() << ", name: " << display->GetName() << std::endl;
+        std::cout << "  width: " << display->GetWidth() << ", height: " << display->GetHeight() << std::endl;
+        std::cout << "  phyWidth: " << display->GetPhysicalWidth() << ", phyHeight: " << display->GetPhysicalHeight() << std::endl;
+        std::cout << "  refreshRate: " << display->GetRefreshRate() << ", rotation: " << static_cast<int32_t>(display->GetRotation()) << std::endl;
+        
         std::vector<uint32_t> hdrFormats;
         display->GetSupportedHDRFormats(hdrFormats);
         std::cout << "  HDRFormats: [";
@@ -1412,7 +1405,7 @@ void print_version() {
 }
 
 // 解析命令行参数
-void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
+void parse_arguments(int argc, char* argv[], CommandLineArgs& args, ScreenInfo &actualInfo) {
     // 定义长选项
     static struct option long_options[] = {
         {"port", required_argument, 0, 'p'},
@@ -1441,32 +1434,32 @@ void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
             case 'w':
                 args.width = std::atoi(optarg);
                 if (args.width <= 0) {
-                    std::cerr << "Invalid width: " << optarg << ", use default " << DEFAULT_WIDTH << std::endl;
-                    args.width = DEFAULT_WIDTH;
+                    std::cerr << "Invalid width: " << optarg << ", use actual " << actualInfo.width << std::endl;
+                    args.width = actualInfo.width;
                 }
                 break;
                 
             case 'h':
                 args.height = std::atoi(optarg);
                 if (args.height <= 0) {
-                    std::cerr << "Invalid height: " << optarg << ", use default " << DEFAULT_HEIGHT << std::endl;
-                    args.height = DEFAULT_HEIGHT;
+                    std::cerr << "Invalid height: " << optarg << ", use actual " << actualInfo.height << std::endl;
+                    args.height = actualInfo.height;
                 }
                 break;
                 
             case 'f':
                 args.framerate = std::atoi(optarg);
                 if (args.framerate <= 0) {
-                    std::cerr << "Invalid framerate: " << optarg << ", use default " << DEFAULT_FPS << std::endl;
-                    args.framerate = DEFAULT_FPS;
+                    std::cerr << "Invalid framerate: " << optarg << ", use actual " << actualInfo.fps << std::endl;
+                    args.framerate = actualInfo.fps;
                 }
                 break;
                 
             case 'b':
                 args.bitrate = std::atoi(optarg);
                 if (args.bitrate <= 0) {
-                    std::cerr << "Invalid bitrate: " << optarg << ", use default " << DEFAULT_BITRATE << std::endl;
-                    args.bitrate = DEFAULT_BITRATE;
+                    std::cerr << "Invalid bitrate: " << optarg << ", use actual " << actualInfo.bitrate << std::endl;
+                    args.bitrate = actualInfo.bitrate;
                 }
                 break;
                 
@@ -1491,9 +1484,14 @@ int main(int argc, char* argv[]) {
     
     print_version();
 
+    // 获取设备屏幕信息
+    ScreenInfo screenInfo;
+    OHScrcpyServer server;
+    server.getPrimaryScreenInfo(screenInfo);
+
     // 解析命令行参数
     CommandLineArgs args;
-    parse_arguments(argc, argv, args);
+    parse_arguments(argc, argv, args, screenInfo);
     if (args.show_help) {
         print_usage(argv[0]);
         return 0;
@@ -1502,10 +1500,8 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     
-    // 创建并启动服务
-    OHScrcpyServer server;
-    bool isUserCfg = (argc > 1);
-    if (!server.start(args, isUserCfg)) {
+    // 启动服务
+    if (!server.start(args)) {
         std::cerr << "Start OHScrcpy server fail" << std::endl;
         return 1;
     }

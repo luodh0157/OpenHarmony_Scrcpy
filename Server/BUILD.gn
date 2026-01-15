@@ -37,6 +37,7 @@ ohos_executable("ohscrcpy_server") {
     "media_foundation:native_media_core",
     "graphic_surface:surface",
     "window_manager:libdm",
+    "c_utils:utils",
   ]
   
   subsystem_name = "multimedia"
