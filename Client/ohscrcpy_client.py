@@ -14,32 +14,33 @@ import time
 import struct
 import gc
 import webbrowser
+import traceback
+import numpy as np
 from enum import IntEnum, auto
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Tuple, Callable
 import tkinter as tk
 from tkinter import ttk, messagebox
-import numpy as np
-from PIL import Image, ImageTk, ImageDraw, ImageFont
 
 # ==================== 常量定义 ====================
 AUTHOR = "luodh0157"
 PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
-VERSION = "v1.3"
+VERSION = "v1.4"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
 HEARTBEAT_TIMEOUT = 5.0  # 心跳超时时间（秒）
 HEARTBEAT_INTERVAL = 1.0  # 心跳发送间隔（秒）
 PACKET_HEADER_SIZE = 8
 
-# 数据包类型定义
-PACKET_TYPE_HEARTBEAT = 0x00000000
-PACKET_TYPE_SPS = 0x00000001
-PACKET_TYPE_PPS = 0x00000002
-PACKET_TYPE_KEYFRAME = 0x00000003
-PACKET_TYPE_FRAME = 0x00000004
-PACKET_TYPE_CONFIG = 0x00000005
+# ==================== 数据包类型定义 ====================
+class PacketType(IntEnum):
+    PACKET_HEARTBEAT = 0
+    PACKET_SPS = 1
+    PACKET_PPS = 2
+    PACKET_KEYFRAME = 3
+    PACKET_FRAME = 4
+    PACKET_CONFIG = 5
 
 # ==================== 日志函数定义 ====================
 class LogLevel(IntEnum):
@@ -66,11 +67,12 @@ class ServerDeployState(IntEnum):
 @dataclass
 class DeviceInfo:
     """设备信息"""
-    serial: str
+    sn: str
     model: str = "Unknown Model"
+    manufacturer: str = "default"
     
     def display_name(self) -> str:
-        return f"{self.serial[:8]}****{self.serial[-8:]} ({self.model})"
+        return f"{self.sn[:8]}****{self.sn[-8:]} ({self.model})"
 
 @dataclass  
 class VideoStreamConfig:
@@ -321,33 +323,64 @@ class HDCCommandExecutor:
 class ServerManager:
     """服务端管理器"""
     
-    def __init__(self, hdc_executor: HDCCommandExecutor):
+    def __init__(self, manufacturer: str, hdc_executor: HDCCommandExecutor):
         self.hdc = hdc_executor
         self.server_process = None
+        self.manufacturer = manufacturer
         self.log_title = "服务端管理器"
+        
+        # 获取资源文件的正确路径
+        self.server_exe_file = self._get_resource_path("ohscrcpy_server", manufacturer)
+        self.server_cfg_file = self._get_resource_path("ohscrcpy_server.cfg")
+    
+    def _get_resource_path(self, filename: str, manufacturer: str = "default"):
+        """获取资源文件的正确路径（支持PyInstaller打包）"""
+        try:
+            # PyInstaller打包后
+            if hasattr(sys, '_MEIPASS'):
+                base_path = sys._MEIPASS
+            else:
+                # 开发环境
+                base_path = os.path.dirname(os.path.abspath(__file__))
+            
+            if manufacturer != "default":
+                base_path += os.sep + manufacturer + os.sep
+            server_path = os.path.join(base_path, filename)
+            print_log(LogLevel.DEBUG, self.log_title, f"待安装服务端可执行文件路径: {server_path}")
+            return server_path
+        except Exception as e:
+            print_log(LogLevel.ERROR, self.log_title, f"获取资源路径失败: {e}")
+            return filename  # 回退到原始相对路径
+    
+    def update_manufacturer(self, manufacturer: str):
+        """更新设备制造商信息"""
+        self.manufacturer = manufacturer
+        # 获取资源文件的正确路径
+        self.server_exe_file = self._get_resource_path("ohscrcpy_server", manufacturer)
+        self.server_cfg_file = self._get_resource_path("ohscrcpy_server.cfg")
     
     def install_server(self) -> bool:
         """安装服务端"""
         print_log(LogLevel.INFO, self.log_title, f"开始安装...")
         
         # 1. 检查文件是否存在
-        if not os.path.exists("ohscrcpy_server"):
-            print_log(LogLevel.FATAL, self.log_title, f"错误: ohscrcpy_server 文件不存在")
+        if not os.path.exists(self.server_exe_file):
+            print_log(LogLevel.FATAL, self.log_title, f"错误: {self.server_exe_file} 文件不存在")
             return False
         
-        if not os.path.exists("ohscrcpy_server.cfg"):
-            print_log(LogLevel.FATAL, self.log_title, f"错误: ohscrcpy_server.cfg 文件不存在")
+        if not os.path.exists(self.server_cfg_file):
+            print_log(LogLevel.FATAL, self.log_title, f"错误: {self.server_cfg_file} 文件不存在")
             return False
         
         # 2. 重新挂载系统为读写模式
         print_log(LogLevel.DEBUG, self.log_title, f"挂载系统为读写模式...")
-        result = self.hdc.execute(["shell", "mount", "-o", "rw,remount", "/"])
+        result = self.hdc.execute(["target", "mount"])
         if not result["success"]:
             print_log(LogLevel.ERROR, self.log_title, f"挂载失败: {result.get('stderr', '未知错误')}")
         
         # 3. 推送可执行文件
         print_log(LogLevel.DEBUG, self.log_title, f"推送可执行文件...")
-        result = self.hdc.execute(["file", "send", "ohscrcpy_server", "/system/bin/"])
+        result = self.hdc.execute(["file", "send", self.server_exe_file, "/system/bin/"])
         if not result["success"]:
             print_log(LogLevel.ERROR, self.log_title, f"推送 ohscrcpy_server 失败: {result.get('stderr', '未知错误')}")
             return False
@@ -361,7 +394,7 @@ class ServerManager:
         
         # 5. 推送配置文件
         print_log(LogLevel.DEBUG, self.log_title, f"推送配置文件...")
-        result = self.hdc.execute(["file", "send", "ohscrcpy_server.cfg", "/system/etc/init/"])
+        result = self.hdc.execute(["file", "send", self.server_cfg_file, "/system/etc/init/"])
         if not result["success"]:
             print_log(LogLevel.ERROR, self.log_title, f"推送 ohscrcpy_server.cfg 失败: {result.get('stderr', '未知错误')}")
             return False
@@ -486,7 +519,13 @@ class ServerManager:
         if not result["success"]:
             print_log(LogLevel.ERROR, self.log_title, f"唤醒设备失败，继续执行...")
         
-        # 2. 设置显示模式
+        # 2. 解锁屏幕
+        unlock_args = ["shell", "uinput", "-T", "-m", str(350), str(1100), str(350), str(500), str(200)]
+        result = self.hdc.execute(unlock_args)
+        if not result["success"]:
+            print_log(LogLevel.ERROR, self.log_title, f"解锁设备屏幕失败，继续执行...")
+        
+        # 3. 设置显示模式
         print_log(LogLevel.INFO, self.log_title, f"设置屏幕常亮...")
         result = self.hdc.execute(["shell", "power-shell", "setmode", "602"])
         if not result["success"]:
@@ -502,7 +541,7 @@ class DeviceManager:
         self.hdc = hdc_executor
         self.devices: List[DeviceInfo] = []
         self.current_device: Optional[DeviceInfo] = None
-        self.server_manager = ServerManager(self.hdc)
+        self.server_manager: Optional[ServerManager] = None
         self.port_forwarding = -1
         self.log_title = "设备管理器"
         
@@ -524,28 +563,28 @@ class DeviceManager:
             if not parts:
                 continue
             
-            serial = parts[0].strip()
-            model = self.get_device_model(serial)
-            devices.append(DeviceInfo(serial=serial, model=model))
+            sn = parts[0].strip()
+            if sn == "[Empty]":
+                continue
+            model = self.get_device_param(sn, "const.product.model")
+            manufacturer = self.get_device_param(sn, "const.product.manufacturer")
+            devices.append(DeviceInfo(sn=sn, model=model,manufacturer=manufacturer))
         
         self.devices = devices
         if devices:
             self.current_device = devices[0]
-            self.hdc.set_device(devices[0].serial)
+            self.hdc.set_device(devices[0].sn)
+            self.server_manager = ServerManager(devices[0].manufacturer, self.hdc)
         
         return devices
-        
-    def get_device_model(self, serial: str) -> str:
-        """获取指定设备产品型号"""
-        return self.get_device_param(serial, "const.product.model")
     
-    def get_device_param(self, serial: str, param: str) -> str:
+    def get_device_param(self, sn: str, param: str) -> str:
         """获取指定设备系统属性"""
         if not param:
             print_log(LogLevel.WARN, self.log_title, f"查询的系统属性不能为空")
             return ""
         
-        cmd = ["-t", serial, "shell", "param", "get"]
+        cmd = ["-t", sn, "shell", "param", "get"]
         cmd.append(param)
         result = self.hdc.execute(cmd)
         if not result["success"]:
@@ -555,12 +594,14 @@ class DeviceManager:
         print_log(LogLevel.INFO, self.log_title, f"获取系统属性: [{param}], 结果: [{ret}]")
         return ret
     
-    def select_device(self, serial: str) -> bool:
+    def select_device(self, sn: str) -> bool:
         """选择设备"""
         for device in self.devices:
-            if device.serial == serial:
+            if device.sn == sn:
                 self.current_device = device
-                self.hdc.set_device(serial)
+                self.hdc.set_device(sn)
+                if self.server_manager:
+                    self.server_manager.update_manufacturer(device.manufacturer)
                 return True
         return False
     
@@ -625,26 +666,38 @@ class DeviceManager:
     
     def install_server(self) -> bool:
         """安装服务端"""
+        if not self.server_manager:
+            return False
         return self.server_manager.install_server()
     
     def uninstall_server(self) -> bool:
         """卸载服务端"""
+        if not self.server_manager:
+            return False
         return self.server_manager.uninstall_server()
     
     def start_server(self, port: int) -> bool:
         """启动服务端"""
+        if not self.server_manager:
+            return False
         return self.server_manager.start_server(port)
     
     def stop_server(self) -> bool:
         """停止服务端"""
+        if not self.server_manager:
+            return False
         return self.server_manager.stop_server()
         
     def check_server_installed(self) -> bool:
         """检查服务端是否已安装"""
+        if not self.server_manager:
+            return False
         return self.server_manager.check_server_installed()
         
     def check_server_running(self) -> bool:
         """检查服务端是否在运行"""
+        if not self.server_manager:
+            return False
         return self.server_manager.check_server_running()
 
 # ==================== H.264解码器 ====================
@@ -679,13 +732,12 @@ class H264Decoder:
     def _init_codec(self):
         """初始化解码器"""
         try:
-            import av
-            
             # 释放现有解码器
             if self.codec_ctx is not None:
                 self.codec_ctx = None
             
             # 创建解码器上下文
+            import av
             self.codec_ctx = av.CodecContext.create('h264', 'r')
             
             # 设置解码器参数
@@ -706,7 +758,6 @@ class H264Decoder:
             
         except Exception as e:
             print_log(LogLevel.ERROR, self.log_title, f"初始化失败: {e}")
-            import traceback
             traceback.print_exc()
             return False
 
@@ -720,8 +771,6 @@ class H264Decoder:
         
         # 创建AnnexB格式的extradata
         try:
-            import av
-            
             # 构建AnnexB格式的extradata：起始码 + SPS + 起始码 + PPS
             # 添加SPS
             if not self._has_start_code(self.sps_data):
@@ -762,8 +811,6 @@ class H264Decoder:
         current_time = time.time()
         
         try:
-            import av
-            
             # 确保数据有起始码
             if not self._has_start_code(frame_data):
                 frame_data = b'\x00\x00\x00\x01' + frame_data
@@ -778,6 +825,7 @@ class H264Decoder:
             
             # 解析数据包
             try:
+                import av
                 packets = self.codec_ctx.parse(frame_data)
                 if len(packets) == 0:
                     packets = self.codec_ctx.parse(frame_data)
@@ -929,7 +977,6 @@ class VideoStreamClient:
             
         except Exception as e:
             print_log(LogLevel.ERROR, self.log_title, f"连接失败: {e}")
-            import traceback
             traceback.print_exc()
         
         self.disconnect()
@@ -1023,7 +1070,7 @@ class VideoStreamClient:
             try:
                 # 发送心跳包
                 if self.socket:
-                    heartbeat_packet = struct.pack('>II', PACKET_TYPE_HEARTBEAT, 0)
+                    heartbeat_packet = struct.pack('>II', PacketType.PACKET_HEARTBEAT, 0)
                     self.socket.sendall(heartbeat_packet)
                     if self.debug:
                         print_log(LogLevel.DEBUG, self.log_title, f"发送心跳包")
@@ -1120,8 +1167,8 @@ class VideoStreamClient:
                 data_len = struct.unpack('>I', self.recv_buffer[4:8])[0]
 
                 # 2. 验证包头有效性
-                valid_types = [PACKET_TYPE_HEARTBEAT, PACKET_TYPE_SPS, PACKET_TYPE_PPS,
-                               PACKET_TYPE_KEYFRAME, PACKET_TYPE_FRAME, PACKET_TYPE_CONFIG]
+                valid_types = [PacketType.PACKET_HEARTBEAT, PacketType.PACKET_SPS, PacketType.PACKET_PPS,
+                               PacketType.PACKET_KEYFRAME, PacketType.PACKET_FRAME, PacketType.PACKET_CONFIG]
                 if packet_type not in valid_types:
                     # 严重错误，丢弃第一个字节，尝试重新寻找同步点
                     del self.recv_buffer[0:1]
@@ -1193,26 +1240,26 @@ class VideoStreamClient:
         
         # 记录包类型用于调试
         packet_type_names = {
-            PACKET_TYPE_HEARTBEAT: "HEARTBEAT",
-            PACKET_TYPE_SPS: "SPS",
-            PACKET_TYPE_PPS: "PPS",
-            PACKET_TYPE_KEYFRAME: "KEYFRAME", 
-            PACKET_TYPE_FRAME: "FRAME",
-            PACKET_TYPE_CONFIG: "CONFIG"
+            PacketType.PACKET_HEARTBEAT: "HEARTBEAT",
+            PacketType.PACKET_SPS: "SPS",
+            PacketType.PACKET_PPS: "PPS",
+            PacketType.PACKET_KEYFRAME: "KEYFRAME", 
+            PacketType.PACKET_FRAME: "FRAME",
+            PacketType.PACKET_CONFIG: "CONFIG"
         }
         
         type_name = packet_type_names.get(packet_type, f"UNKNOWN({packet_type})")
         # === 零长度数据包处理 ===
         if data_len == 0:
             # 心跳包长度为0是正常的，其他类型则可能是错误
-            if packet_type != PACKET_TYPE_HEARTBEAT:
+            if packet_type != PacketType.PACKET_HEARTBEAT:
                 print_log(LogLevel.WARN, self.log_title, f"警告: 收到零长度的 {type_name} 包，可能为协议错误，直接忽略！")
             return
         
         # 详细日志输出
         if self.debug:
             need_print = True
-        elif packet_type != PACKET_TYPE_HEARTBEAT and packet_type != PACKET_TYPE_FRAME:
+        elif packet_type != PacketType.PACKET_HEARTBEAT and packet_type != PacketType.PACKET_FRAME:
             need_print = True
         else:
             need_print = False
@@ -1220,14 +1267,14 @@ class VideoStreamClient:
         if need_print:
             print_log(LogLevel.DEBUG, self.log_title, f"收到包: {type_name}, 长度={data_len}字节")
         
-        if packet_type == PACKET_TYPE_HEARTBEAT:
+        if packet_type == PacketType.PACKET_HEARTBEAT:
             self.last_heartbeat_time = time.time()
             return
         
-        elif packet_type == PACKET_TYPE_CONFIG:
+        elif packet_type == PacketType.PACKET_CONFIG:
             return
         
-        elif packet_type == PACKET_TYPE_SPS:
+        elif packet_type == PacketType.PACKET_SPS:
             self.sps_data = packet_data
             self.sps_received = True
             
@@ -1240,7 +1287,7 @@ class VideoStreamClient:
                     print_log(LogLevel.ERROR, self.log_title, f"解码器初始化失败")
             return
         
-        elif packet_type == PACKET_TYPE_PPS:
+        elif packet_type == PacketType.PACKET_PPS:
             self.pps_data = packet_data
             self.pps_received = True
             
@@ -1253,10 +1300,10 @@ class VideoStreamClient:
                     print_log(LogLevel.ERROR, self.log_title, f"解码器初始化失败")
             return
         
-        elif packet_type == PACKET_TYPE_KEYFRAME:
+        elif packet_type == PacketType.PACKET_KEYFRAME:
             is_keyframe = True
         
-        elif packet_type == PACKET_TYPE_FRAME:
+        elif packet_type == PacketType.PACKET_FRAME:
             is_keyframe = False
         
         else:
@@ -1334,47 +1381,50 @@ class VideoStreamClient:
 
     def disconnect(self):
         """断开连接"""
-        print_log(LogLevel.INFO, self.log_title, f"断开连接...")
-        # 停止服务端
-        self.device_manager.stop_server()
-        # 移除端口转发
-        port = self.device_manager.get_port_forwarding()
-        if port > 0:
-            self.device_manager.remove_port_forwarding(port, port)
-            self.device_manager.reset_port_forwarding()
+        def disconnect_async():
+            print_log(LogLevel.INFO, self.log_title, f"断开连接...")
+            # 停止服务端
+            self.device_manager.stop_server()
+            # 移除端口转发
+            port = self.device_manager.get_port_forwarding()
+            if port > 0:
+                self.device_manager.remove_port_forwarding(port, port)
+                self.device_manager.reset_port_forwarding()
+            
+            self._stop_event.set()
+            
+            self.is_streaming = False
+            self.is_connected = False
+            
+            # 清理解码器
+            if self.decoder:
+                self.decoder.cleanup()
+                self.decoder = None
+            
+            if self.socket:
+                try:
+                    self.socket.close()
+                except:
+                    pass
+                self.socket = None
+            
+            # 等待线程结束
+            if self.heartbeat_thread and self.heartbeat_thread.is_alive():
+                self.heartbeat_thread.join(timeout=1.0)
+            
+            if self.monitor_thread and self.monitor_thread.is_alive():
+                self.monitor_thread.join(timeout=1.0)
+            
+            # 清空队列
+            while not self.frame_queue.empty():
+                try:
+                    self.frame_queue.get_nowait()
+                except:
+                    break
+            
+            print_log(LogLevel.INFO, self.log_title, f"断开连接已完成")
         
-        self._stop_event.set()
-        
-        self.is_streaming = False
-        self.is_connected = False
-        
-        # 清理解码器
-        if self.decoder:
-            self.decoder.cleanup()
-            self.decoder = None
-        
-        if self.socket:
-            try:
-                self.socket.close()
-            except:
-                pass
-            self.socket = None
-        
-        # 等待线程结束
-        if self.heartbeat_thread and self.heartbeat_thread.is_alive():
-            self.heartbeat_thread.join(timeout=1.0)
-        
-        if self.monitor_thread and self.monitor_thread.is_alive():
-            self.monitor_thread.join(timeout=1.0)
-        
-        # 清空队列
-        while not self.frame_queue.empty():
-            try:
-                self.frame_queue.get_nowait()
-            except:
-                break
-        
-        print_log(LogLevel.INFO, self.log_title, f"断开连接已完成")
+        threading.Thread(target=disconnect_async, daemon=True).start()
 
 # ==================== 设备控制器 ====================
 class DeviceController:
@@ -1515,6 +1565,10 @@ class DeviceController:
         """返回键"""
         return self.send_key("back")
     
+    def unlock_screen(self) -> bool:
+        """解锁屏幕"""
+        return self.send_swipe(350, 1100, 350, 500, 200)
+    
     def volume_up(self) -> bool:
         """音量加"""
         return self.send_key("volume_up")
@@ -1531,12 +1585,6 @@ class OHScrcpyGUI:
         self.root = tk.Tk()
         self.root.title(f"OHScrcpy - OpenHarmony投屏工具 {VERSION}    （作者: {AUTHOR}）")
         self.root.geometry("1200x800")
-        
-        # 初始化组件
-        self.hdc_executor = HDCCommandExecutor()
-        self.device_manager = DeviceManager(self.hdc_executor)
-        self.device_controller = None
-        self.video_client = VideoStreamClient(device_manager=self.device_manager, on_frame_decoded=self._on_frame_decoded, debug=False)
         
         # 状态变量
         self.is_connected = False
@@ -1576,6 +1624,15 @@ class OHScrcpyGUI:
         self.setup_ui()
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root.bind('<Configure>', self.on_window_resize)
+        
+        # 初始化组件
+        def init_component_async():
+            self.hdc_executor = HDCCommandExecutor()
+            self.device_manager = DeviceManager(self.hdc_executor)
+            self.device_controller = None
+            self.video_client = VideoStreamClient(device_manager=self.device_manager, on_frame_decoded=self._on_frame_decoded, debug=False)
+            self.refresh_devices()
+        threading.Thread(target=init_component_async, daemon=True).start()
         
         print_log(LogLevel.INFO, self.log_title, f"初始化完成")
     
@@ -1749,8 +1806,6 @@ class OHScrcpyGUI:
         
         # 初始显示等待画面
         self._show_waiting_screen()
-        
-        self.refresh_devices()
     
     def create_device_panel(self, parent):
         """创建设备面板"""
@@ -1784,6 +1839,7 @@ class OHScrcpyGUI:
             ("电源", self.power_key, "#e74c3c"),
             ("主页", self.home_key, "#2ecc71"),
             ("返回", self.back_key, "#3498db"),
+            ("解锁", self.unlock_screen, "#3498db"),
             ("音量+", self.volume_up, "#9b59b6"),
             ("音量-", self.volume_down, "#9b59b6"),
         ]
@@ -1870,6 +1926,7 @@ class OHScrcpyGUI:
         
         try:
             # 获取最新帧
+            import numpy as np
             frame = self.video_client.get_current_frame(timeout=0.001)
             if frame is None:
                 # 没有新帧，使用最后解码的帧
@@ -1885,6 +1942,7 @@ class OHScrcpyGUI:
                 
                 # 转换为PIL图像
                 try:
+                    from PIL import Image
                     pil_img = Image.fromarray(frame, 'RGB')
                 except Exception as e:
                     print_log(LogLevel.ERROR, self.log_title, f"创建PIL图像失败: {e}")
@@ -1936,6 +1994,7 @@ class OHScrcpyGUI:
                 
                 # 转换为Tkinter图像
                 try:
+                    from PIL import ImageTk
                     self.tk_image = ImageTk.PhotoImage(pil_img_resized)
                     # 保持引用，防止被垃圾回收
                     self.image_refs.append(self.tk_image)
@@ -2068,6 +2127,7 @@ class OHScrcpyGUI:
             messagebox.showerror("错误", f"{msg}")
     
     def install_and_start_server_async(self):
+        self.video_client.disconnect()
         selected = self.device_var.get()
         if not selected:
             print_log(LogLevel.WARN, self.log_title, f"用户选择设备为空")
@@ -2079,7 +2139,7 @@ class OHScrcpyGUI:
                 target_device = device
                 break
         
-        if not target_device or not self.device_manager.select_device(target_device.serial):
+        if not target_device or not self.device_manager.select_device(target_device.sn):
             self.update_device_status("设备选择失败")
             return
         
@@ -2087,7 +2147,7 @@ class OHScrcpyGUI:
         port = self.device_manager.get_port_forwarding()
         if port == -1:
             print_log(LogLevel.ERROR, self.log_title, f"获取可用转发端口失败！")
-            self.root.after(0, self.on_server_deploy_finish, "获取可用转发端口失败！")
+            self.root.after(0, self.on_server_deploy_finish, False, "获取可用转发端口失败！")
             return
         
         # 1. 检查服务端是否已安装
@@ -2099,7 +2159,7 @@ class OHScrcpyGUI:
             # 安装服务端
             if not self.device_manager.install_server():
                 print_log(LogLevel.ERROR, self.log_title, f"服务端安装失败！")
-                self.root.after(0, self.on_server_deploy_finish, "服务端安装失败！")
+                self.root.after(0, self.on_server_deploy_finish, False, "服务端安装失败！")
                 return
         else:
             print_log(LogLevel.INFO, self.log_title, f"服务端已安装")
@@ -2111,7 +2171,8 @@ class OHScrcpyGUI:
             print_log(LogLevel.INFO, self.log_title, f"启动服务端...")
             if not self.device_manager.start_server(port):
                 print_log(LogLevel.ERROR, self.log_title, f"服务端启动失败！")
-                self.root.after(0, self.on_server_deploy_finish, f"服务端启动失败！")
+                self.update_running_status(f"[预安装] 启动服务端失败！")
+                self.root.after(0, self.on_server_deploy_finish, False, "服务端启动失败！")
                 return
             
             # 等待服务端完全启动
@@ -2164,79 +2225,83 @@ class OHScrcpyGUI:
                 target_device = device
                 break
         
-        if not target_device or not self.device_manager.select_device(target_device.serial):
+        if not target_device or not self.device_manager.select_device(target_device.sn):
             self.update_device_status("设备选择失败")
             return
         
-        port = self.device_manager.get_port_forwarding()
-        if port == -1:
-            print_log(LogLevel.ERROR, self.log_title, f"获取可用转发端口失败")
-            return
-        
-        # 安装并启动服务端
-        if not self.install_and_start_server(port):
-            return
-
-        # 设置端口转发
-        print_log(LogLevel.INFO, self.log_title, f"设置端口转发...")
-        if not self.device_manager.setup_port_forwarding(port, port):
-            print_log(LogLevel.ERROR, self.log_title, f"端口转发失败，请尝试重新连接...")
-            return
-
-        try:
-            device = self.device_manager.get_current_device()
-            self.update_device_status(f"正在连接设备: {device.serial}...")
-        
-            # 连接视频流
-            print_log(LogLevel.DEBUG, self.log_title, f"连接视频流服务器...")
-            if self.video_client.connect(HOST, port):
-                # 获取视频配置
-                config = self.video_client.config
-                
-                # 设置设备控制器
-                self.device_controller = DeviceController(self.hdc_executor)
-                self.device_controller.bind_video_canvas(self.video_canvas)
-                
-                # 更新UI状态
-                self.is_connected = True
-                self.connect_btn.config(text="断开", bg="#e74c3c")
-                self.connection_status_label.config(text="已连接", fg="#2ecc71")
-                self.device_status_label.config(text=f"设备: {device.serial}")
-                
-                # 重置显示计数器
-                self.displayed_frames = 0
-                self.frame_counter = 0
-                self.last_fps_time = time.time()
-                self.last_print_frames = 0
-                
-                # 清除等待画面
-                self.video_canvas.delete("all")
-                self.video_canvas.config(bg="black")
-                
-                # 启动视频显示
-                self._update_video_display()
-                
-                self.update_device_status(f"连接成功！分辨率: {config.width}x{config.height}")
-                
-                # 添加调试快捷键
-                self.root.bind('<F5>', lambda e: self._print_debug_info())
-                self.root.bind('<F6>', lambda e: self._save_debug_frame())
-                self.root.bind('<F8>', lambda e: self._show_debug_window())
-                self.root.bind('<F9>', lambda e: self._force_garbage_collection())
-            else:
-                self.update_device_status("连接失败")
-                messagebox.showinfo("连接失败",
-                    "无法连接到服务端！请检查:\n"
-                    "1. 服务端是否在设备上运行\n"
-                    "2. 服务端口是否正确")
+        def connect_device_async():
+            port = self.device_manager.get_port_forwarding()
+            if port == -1:
+                print_log(LogLevel.ERROR, self.log_title, f"获取可用转发端口失败")
                 return
             
-        except Exception as e:
-            self.update_device_status(f"连接失败: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            self.disconnect_device()
-            return
+            # 安装并启动服务端
+            if not self.install_and_start_server(port):
+                return
+
+            # 设置端口转发
+            print_log(LogLevel.INFO, self.log_title, f"设置端口转发...")
+            if not self.device_manager.setup_port_forwarding(port, port):
+                print_log(LogLevel.ERROR, self.log_title, f"端口转发失败，请尝试重新连接...")
+                return
+
+            try:
+                device = self.device_manager.get_current_device()
+                self.update_device_status(f"正在连接设备: {device.sn}...")
+            
+                # 连接视频流
+                print_log(LogLevel.DEBUG, self.log_title, f"连接视频流服务器...")
+                if self.video_client.connect(HOST, port):
+                    # 获取视频配置
+                    config = self.video_client.config
+                    
+                    # 设置设备控制器
+                    self.device_controller = DeviceController(self.hdc_executor)
+                    self.device_controller.bind_video_canvas(self.video_canvas)
+                    
+                    # 更新UI状态
+                    self.is_connected = True
+                    self.connect_btn.config(text="断开", bg="#e74c3c")
+                    self.connection_status_label.config(text="已连接", fg="#2ecc71")
+                    self.device_status_label.config(text=f"设备: {device.sn}")
+                    
+                    # 重置显示计数器
+                    self.displayed_frames = 0
+                    self.frame_counter = 0
+                    self.last_fps_time = time.time()
+                    self.last_print_frames = 0
+                    
+                    # 清除等待画面
+                    self.video_canvas.delete("all")
+                    self.video_canvas.config(bg="black")
+                    
+                    # 启动视频显示
+                    self._update_video_display()
+                    
+                    self.update_device_status(f"连接成功！分辨率: {config.width}x{config.height}")
+                    
+                    # 添加调试快捷键
+                    self.root.bind('<F5>', lambda e: self._print_debug_info())
+                    self.root.bind('<F6>', lambda e: self._save_debug_frame())
+                    self.root.bind('<F8>', lambda e: self._show_debug_window())
+                    self.root.bind('<F9>', lambda e: self._force_garbage_collection())
+                else:
+                    self.update_device_status("连接失败")
+                    self.disconnect_device()
+                    messagebox.showinfo("连接失败",
+                        "无法连接到服务端！请检查:\n"
+                        "1. 服务端是否在设备上运行\n"
+                        "2. 服务端口是否正确")
+                    return
+                
+            except Exception as e:
+                self.update_device_status(f"连接失败: {str(e)}")
+                traceback.print_exc()
+                self.disconnect_device()
+                return
+        
+        threading.Thread(target=connect_device_async, daemon=True).start()
+        self.connect_btn.config(text="连接中", bg="#e74c3c")
     
     def disconnect_device(self):
         """断开设备"""
@@ -2284,6 +2349,11 @@ class OHScrcpyGUI:
             self.device_controller.back_key()
             print_log(LogLevel.INFO, self.log_title, f"发送返回键")
     
+    def unlock_screen(self):
+        if self.is_connected and self.device_controller:
+            self.device_controller.unlock_screen()
+            print_log(LogLevel.INFO, self.log_title, f"发送解锁屏幕")
+    
     def volume_up(self):
         if self.is_connected and self.device_controller:
             self.device_controller.volume_up()
@@ -2330,6 +2400,7 @@ class OHScrcpyGUI:
         debug_frame_title = "保存调试帧"
         if self.current_frame is not None:
             try:
+                from PIL import Image
                 debug_dir = "debug_frames"
                 os.makedirs(debug_dir, exist_ok=True)
                 
@@ -2381,15 +2452,15 @@ class OHScrcpyGUI:
         text_widget.insert(tk.END, "\n".join(debug_info))
         text_widget.config(state=tk.DISABLED)
     
-    def _async_garbage_collection_func(self):
-        """异步垃圾回收"""
-        print_log(LogLevel.INFO, self.log_title, f"强制垃圾回收...")
-        collected = gc.collect()
-        print_log(LogLevel.INFO, self.log_title, f"回收了 {collected} 个对象")
-    
     def _force_garbage_collection(self):
         """强制垃圾回收"""
-        threading.Thread(target=self._async_garbage_collection_func, daemon=True).start()
+        def _async_garbage_collection_func():
+            """异步垃圾回收"""
+            print_log(LogLevel.INFO, self.log_title, f"强制垃圾回收...")
+            collected = gc.collect()
+            print_log(LogLevel.INFO, self.log_title, f"回收了 {collected} 个对象")
+        
+        threading.Thread(target=_async_garbage_collection_func, daemon=True).start()
     
     def update_device_status(self, message: str):
         """更新状态"""
@@ -2402,6 +2473,7 @@ class OHScrcpyGUI:
                 self.disconnect_device()
                 self.root.destroy()
         else:
+            self.video_client.disconnect()
             self.root.destroy()
     
     def on_window_resize(self, event):
@@ -2418,24 +2490,12 @@ def main():
     print(" "*15, f"OpenHarmony_Scrcpy Client - {VERSION} (author: luodh0157)", " "*15)
     print("="*84)
     
-    # 检查依赖
-    try:
-        import av
-        import numpy as np
-        from PIL import Image, ImageTk
-        print(f"✓ 依赖库检查通过 (numpy, PIL, av)")
-    except ImportError as e:
-        print(f"✗ 缺少依赖库: {e}")
-        print(f"请运行: pip install numpy pillow av")
-        return
-    
     # 启动GUI
     try:
         app = OHScrcpyGUI()
         app.run()
     except Exception as e:
         print_log(LogLevel.ERROR, "主函数", f"GUI启动失败: {e}")
-        import traceback
         traceback.print_exc()
 
 if __name__ == "__main__":
