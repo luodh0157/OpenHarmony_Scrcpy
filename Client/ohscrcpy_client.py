@@ -26,7 +26,7 @@ from tkinter import ttk, messagebox
 # ==================== 常量定义 ====================
 AUTHOR = "luodh0157"
 PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
-VERSION = "v1.4"
+VERSION = "v1.5"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
 HEARTBEAT_TIMEOUT = 5.0  # 心跳超时时间（秒）
