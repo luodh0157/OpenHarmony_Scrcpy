@@ -55,7 +55,7 @@
 #define PACKET_TYPE_CONFIG_DATA    0x00000006
 
 // 版本信息
-#define VERSION "v1.3"
+#define VERSION "v1.4"
 
 // H.264 NALU类型
 enum H264NaluType {
@@ -65,6 +65,9 @@ enum H264NaluType {
     NALU_TYPE_SEI = 6,
     NALU_TYPE_NON_IDR = 1
 };
+
+using namespace OHOS;
+using namespace OHOS::Rosen;
 
 // 全局控制标志
 std::atomic<bool> g_running(false);
@@ -84,6 +87,7 @@ struct ScreenInfo {
     int32_t height = DEFAULT_HEIGHT;
     int32_t fps = DEFAULT_FPS;
     int32_t bitrate = DEFAULT_BITRATE;
+    uint64_t displayid = 0;
     std::string codec = "h264";
 };
 
@@ -743,6 +747,12 @@ public:
             }
             std::cout << std::endl;
             
+            // 发送视频配置信息
+            if (!context_->streamer->sendVideoConfig(context_->screen_info)) {
+                std::cerr << "Failed to send video config" << std::endl;
+                return false;
+            }
+            
             // 发送SPS
             if (!context_->streamer->sendPacket(context_->sps_data.data(), 
                                             context_->sps_data.size(), 
@@ -758,13 +768,6 @@ public:
                 std::cerr << "Failed to send PPS" << std::endl;
                 return false;
             }
-            
-            // 发送视频配置信息
-            if (!context_->streamer->sendVideoConfig(context_->screen_info)) {
-                std::cerr << "Failed to send video config" << std::endl;
-                return false;
-            }
-            
             context_->sps_pps_sent = true;
             return true;
         }
@@ -1115,10 +1118,31 @@ private:
     bool is_capturing_;
 };
 
+class OHScrcpyServer;
+// 显示状态监听类
+class DisplayResolutionListener : public DisplayManager::IDisplayListener {
+public:
+    DisplayResolutionListener(OHScrcpyServer *scrcpy_server) : scrcpy_server_(scrcpy_server) {};
+
+    virtual void OnCreate(DisplayId displayId) override {
+        return;
+    };
+
+    virtual void OnDestroy(DisplayId displayId) override {
+        return;
+    };
+
+    virtual void OnChange(DisplayId displayId) override;
+private:
+    OHScrcpyServer *scrcpy_server_;
+};
+
 // 主服务类
 class OHScrcpyServer {
 public:
-    OHScrcpyServer() : port_(DEFAULT_PORT), screen_info_{} {}
+    OHScrcpyServer() : port_(DEFAULT_PORT), screen_info_{} {
+        display_listener_ = new (std::nothrow) DisplayResolutionListener(this);
+    }
     
     bool start(const CommandLineArgs& args) {
         // 设置端口
@@ -1151,6 +1175,21 @@ public:
         args.bitrate = screenInfo.bitrate;
         return true;
     }
+
+    void resetVideoOutput(uint64_t displayId, int32_t width, int32_t height) {
+        if (displayId != screen_info_.displayid) {
+            return;
+        }
+        if ((width == screen_info_.width) && (height == screen_info_.height)) {
+            return;
+        }
+        std::cout << "Resolution is changed, reset video output: displayId[" << displayId << "] resolution["
+            << width << "x" << height << "]" << std::endl;
+        stopStreaming();
+        screen_info_.width = width;
+        screen_info_.height = height;
+        initStreaming();
+    }
     
 private:
     bool initialize(const CommandLineArgs& args) {
@@ -1174,7 +1213,7 @@ private:
     }
 
     bool getPrimaryScreenInfo(ScreenInfo &info) {
-        auto display = OHOS::Rosen::DisplayManager::GetInstance().GetDefaultDisplay();
+        auto display = DisplayManager::GetInstance().GetDefaultDisplay();
         if (display == nullptr) {
             std::cerr << "DisplayManager::GetDefaultDisplay fail" << std::endl;
             return false;
@@ -1185,11 +1224,12 @@ private:
         info.fps = DEFAULT_FPS;
         info.bitrate = DEFAULT_BITRATE;
         info.codec = "h264";
+        info.displayid = display->GetId();
         return true;
     }
 
     void printScreenDetailsInfo() {
-        auto display = OHOS::Rosen::DisplayManager::GetInstance().GetDefaultDisplay();
+        auto display = DisplayManager::GetInstance().GetDefaultDisplay();
         if (display == nullptr) {
             std::cerr << "DisplayManager::GetDefaultDisplay fail" << std::endl;
             return;
@@ -1258,6 +1298,9 @@ private:
             encoder_.release();
             return false;
         }
+        
+        // 5. 注册显示变化监听
+        DisplayManager::GetInstance().RegisterDisplayListener(display_listener_);
 
         std::cout << "Initialize streaming modules successfully" << std::endl;
         return true;
@@ -1266,6 +1309,7 @@ private:
     void stopStreaming(bool exit = false) {
         std::cout << "Stopping streaming modules..." << std::endl;
         g_streaming = false;
+        DisplayManager::GetInstance().UnregisterDisplayListener(display_listener_);
         capturer_.stop();
         encoder_.stop();
         capturer_.release();
@@ -1384,7 +1428,23 @@ private:
     NetworkStreamer network_;
     ScreenCapturer capturer_;
     VideoEncoder encoder_;
+    sptr<DisplayManager::IDisplayListener> display_listener_;
 };
+
+void DisplayResolutionListener::OnChange(DisplayId displayId) {
+    if (scrcpy_server_ == nullptr) {
+        return;
+    }
+    auto display = DisplayManager::GetInstance().GetDisplayById(displayId);
+    if (display == nullptr) {
+        std::cerr << "DisplayManager::GetDisplayById fail" << std::endl;
+        return;
+    }
+    
+    auto width = display->GetWidth();
+    auto height = display->GetHeight();
+    scrcpy_server_->resetVideoOutput(displayId, width, height);
+}
 
 // 打印使用帮助
 void print_usage(const char* program_name) {

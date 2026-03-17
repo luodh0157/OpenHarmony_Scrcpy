@@ -26,7 +26,7 @@ from tkinter import ttk, messagebox
 # ==================== 常量定义 ====================
 AUTHOR = "luodh0157"
 PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
-VERSION = "v1.5"
+VERSION = "v1.6"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
 HEARTBEAT_TIMEOUT = 5.0  # 心跳超时时间（秒）
@@ -729,6 +729,10 @@ class H264Decoder:
         
         print_log(LogLevel.INFO, self.log_title, f"创建解码器实例: {config.width}x{config.height}")
 
+    def update_resolution(self, width: int, height: int):
+        self.config.width = width
+        self.config.height = height
+
     def _init_codec(self):
         """初始化解码器"""
         try:
@@ -753,13 +757,18 @@ class H264Decoder:
                 except Exception as e:
                     print_log(LogLevel.ERROR, self.log_title, f"设置extradata失败: {e}")
             
-            print_log(LogLevel.INFO, self.log_title, f"CodecContext初始化成功")
+            print_log(LogLevel.INFO, self.log_title, f"CodecContext初始化成功, {self.codec_ctx.width}x{self.codec_ctx.height}")
             return True
             
         except Exception as e:
             print_log(LogLevel.ERROR, self.log_title, f"初始化失败: {e}")
             traceback.print_exc()
             return False
+
+    def is_ready(self) -> bool:
+        if not self.codec_ctx or not self.sps_data or not self.pps_data:
+            return False
+        return True
 
     def set_sps_pps(self, sps_data: bytes, pps_data: bytes):
         """设置SPS和PPS数据"""
@@ -1272,6 +1281,13 @@ class VideoStreamClient:
             return
         
         elif packet_type == PacketType.PACKET_CONFIG:
+            config_msg = struct.unpack('>I I I I', packet_data[0:16])
+            self.config.width = config_msg[0]
+            self.config.height = config_msg[1]
+            self.config.fps = config_msg[2]
+            self.config.bitrate = config_msg[3]
+            self.decoder.update_resolution(config_msg[0], config_msg[1])
+            print_log(LogLevel.INFO, self.log_title, f"收到配置消息: {config_msg[0]}x{config_msg[1]}@{config_msg[2]}fps bitrate:{config_msg[3]}")
             return
         
         elif packet_type == PacketType.PACKET_SPS:
@@ -1285,6 +1301,8 @@ class VideoStreamClient:
                     print_log(LogLevel.INFO, self.log_title, f"解码器初始化成功")
                 else:
                     print_log(LogLevel.ERROR, self.log_title, f"解码器初始化失败")
+                self.sps_received = False
+                self.pps_received = False
             return
         
         elif packet_type == PacketType.PACKET_PPS:
@@ -1298,6 +1316,8 @@ class VideoStreamClient:
                     print_log(LogLevel.INFO, self.log_title, f"解码器初始化成功")
                 else:
                     print_log(LogLevel.ERROR, self.log_title, f"解码器初始化失败")
+                self.sps_received = False
+                self.pps_received = False
             return
         
         elif packet_type == PacketType.PACKET_KEYFRAME:
@@ -1311,7 +1331,7 @@ class VideoStreamClient:
             return
         
         # 只有在解码器初始化成功后才尝试解码
-        if self.decoder and self.sps_received and self.pps_received:
+        if self.decoder and self.decoder.is_ready():
             rgb_array = self.decoder.decode_frame(packet_data, is_keyframe)
             
             if rgb_array is not None:
@@ -1899,12 +1919,6 @@ class OHScrcpyGUI:
         """更新视频显示"""
         current_time = time.time()
         
-        # 定期垃圾回收
-        if current_time - self.last_gc_time > 15.0:
-            self.last_gc_time = current_time
-            if len(self.image_refs) > 10:
-                self.image_refs = self.image_refs[-5:]
-        
         # 检查心跳超时
         if self.is_connected and hasattr(self.video_client, 'last_data_time'):
             time_since_last_data = current_time - self.video_client.last_data_time
@@ -1949,43 +1963,38 @@ class OHScrcpyGUI:
                     self.root.after(10, self._update_video_display)
                     return
                 
-                # 获取原始视频尺寸
-                if self.video_width <= 0 or self.video_height <= 0:
+                # 获取原始视频尺寸，自适应设备分辨率变化
+                if self.video_width != pil_img.width or self.video_height != pil_img.height:
                     self.video_width = pil_img.width
                     self.video_height = pil_img.height
-                    print_log(LogLevel.DEBUG, self.log_title, f"原始视频尺寸: {self.video_width}x{self.video_height}")
-                
-                # 缩放图像，保持原始比例，适应Canvas
-                img_width, img_height = pil_img.size
-                if self.video_ratio == 0.0:
+                    self.video_ratio = 0.0
+                    print_log(LogLevel.INFO, self.log_title, f"原始视频尺寸: {self.video_width}x{self.video_height}")
+                    
                     self.canvas_width = self.video_canvas.winfo_width()
                     self.canvas_height = self.video_canvas.winfo_height()
-                    print_log(LogLevel.DEBUG, self.log_title, f"画布尺寸: {self.canvas_width}x{self.canvas_height}")
+                    print_log(LogLevel.INFO, self.log_title, f"画布尺寸: {self.canvas_width}x{self.canvas_height}")
                     if self.canvas_width <= 10 or self.canvas_height <= 10:
                         self.canvas_width = 800
                         self.canvas_height = 600
                     
                     # 计算适合Canvas的最大尺寸（保持宽高比）
-                    if img_width > 0 and img_height > 0:
-                        width_ratio = self.canvas_width / img_width
-                        height_ratio = self.canvas_height / img_height
-                        self.video_ratio = min(width_ratio, height_ratio)
-                        # 计算显示尺寸
-                        self.display_width = int(img_width * self.video_ratio)
-                        self.display_height = int(img_height * self.video_ratio)
-                        
-                        # 向设备控制器设置分辨率
-                        self.device_controller.set_display_resolution(self.display_width, self.display_height, self.video_ratio)
+                    width_ratio = self.canvas_width / pil_img.width
+                    height_ratio = self.canvas_height / pil_img.height
+                    self.video_ratio = min(width_ratio, height_ratio)
+                    # 计算显示尺寸
+                    self.display_width = int(pil_img.width * self.video_ratio)
+                    self.display_height = int(pil_img.height * self.video_ratio)
+                    print_log(LogLevel.INFO, self.log_title, f"显示尺寸: {self.display_width}x{self.display_height} ratio:{self.video_ratio}")
+                    
+                    # 向设备控制器设置分辨率
+                    self.device_controller.set_display_resolution(self.display_width, self.display_height, self.video_ratio)
                 
-                # 缩放图像
-                if self.display_width != img_width or self.display_height != img_height:
-                    try:
-                        pil_img_resized = pil_img.resize((self.display_width, self.display_height), 
-                                                         Image.Resampling.LANCZOS)
-                    except Exception as e:
-                        print_log(LogLevel.ERROR, self.log_title, f"缩放图像失败: {e}")
-                        pil_img_resized = pil_img
-                else:
+                # 缩放图像，保持原始比例，适应Canvas
+                try:
+                    pil_img_resized = pil_img.resize((self.display_width, self.display_height), 
+                                                     Image.Resampling.LANCZOS)
+                except Exception as e:
+                    print_log(LogLevel.ERROR, self.log_title, f"缩放图像失败: {e}")
                     pil_img_resized = pil_img
                 
                 # 计算居中位置
@@ -1997,11 +2006,8 @@ class OHScrcpyGUI:
                     from PIL import ImageTk
                     self.tk_image = ImageTk.PhotoImage(pil_img_resized)
                     # 保持引用，防止被垃圾回收
+                    self.image_refs.clear()
                     self.image_refs.append(self.tk_image)
-                    
-                    # 限制引用的图像数量
-                    if len(self.image_refs) > 10:
-                        self.image_refs = self.image_refs[-5:]
                 except Exception as e:
                     print_log(LogLevel.ERROR, self.log_title, f"创建Tkinter图像失败: {e}")
                     self.root.after(10, self._update_video_display)
