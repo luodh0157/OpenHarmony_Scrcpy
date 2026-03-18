@@ -9,6 +9,33 @@ echo ===========================================================
 echo      OpenHarmony OHScrcpy 自动化构建脚本（Windows平台）    
 echo ===========================================================
 
+::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
+if defined PROCESSOR_ARCHITEW6432 (
+    set "ARCH=AMD64"
+) else (
+    set "ARCH=%PROCESSOR_ARCHITECTURE%"
+)
+
+if /i "%ARCH%"=="AMD64" (
+    echo 这是64位 x86系统（x64）
+    set "ARCH=x64"
+) else if /i "%ARCH%"=="x86" (
+    echo 这是32位 x86系统（x86）
+    set "ARCH=x86"
+) else if /i "%ARCH%"=="IA64" (
+    echo 这是Intel Itanium 64位系统（i64）
+    set "ARCH=i64"
+) else if /i "%ARCH%"=="ARM64" (
+    echo 这是64位 ARM系统（arm64）
+    set "ARCH=arm64"
+) else if /i "%ARCH%"=="ARM" (
+    echo 这是32位 ARM系统（arm）
+    set "ARCH=arm"
+) else (
+    echo 未知架构：%ARCH%
+)
+echo [信息] 检测到操作系统: Windows, 架构：%ARCH%
+
 where python >nul 2>nul
 if %errorlevel% neq 0 (
     echo -----------------------------------------
@@ -79,6 +106,22 @@ if not exist resources\app.ico (
     exit /b 1
 )
 
+if not exist hdc\Windows\%ARCH%\hdc.exe (
+    echo --------------------------------------------------------
+    echo [警告] 未找到 hdc\Windows\%ARCH%\hdc.exe，请确保该文件存在
+    echo --------------------------------------------------------
+    pause
+    exit /b 1
+)
+
+if not exist hdc\Windows\%ARCH%\libusb_shared.dll (
+    echo ------------------------------------------------------------------
+    echo [警告] 未找到 hdc\Windows\%ARCH%\libusb_shared.dll，请确保该文件存在
+    echo ------------------------------------------------------------------
+    pause
+    exit /b 1
+)
+
 echo *****************************
 echo [信息] 开始安装python依赖...
 echo *****************************
@@ -97,7 +140,7 @@ echo *****************************
 echo ******************************
 echo [信息] 开始PyInstaller打包...
 echo ******************************
-pyinstaller .\ohscrcpy_client.py --name "OHScrcpy" --noconfirm --clean --windowed --console --onedir --add-data "ohscrcpy_server:." --add-data "ohscrcpy_server.cfg:." --add-data "HUAWEI\ohscrcpy_server:HUAWEI" --icon resources\app.ico
+pyinstaller .\ohscrcpy_client.py --name "OHScrcpy" --noconfirm --clean --windowed --console --onedir --add-data "ohscrcpy_server:." --add-data "ohscrcpy_server.cfg:." --add-data "HUAWEI\ohscrcpy_server:HUAWEI" --add-data "hdc\Windows\%ARCH%\hdc.exe:." --add-data "hdc\Windows\%ARCH%\libusb_shared.dll:." --icon resources\app.ico
 if %errorlevel% neq 0 (
     echo ---------------------------
     echo [错误] PyInstaller打包失败
@@ -138,6 +181,22 @@ if not exist dist\OHScrcpy\_internal\HUAWEI\ohscrcpy_server (
     echo -------------------------------------------
     echo [警告] 未找到打包的 HUAWEI\ohscrcpy_server
     echo -------------------------------------------
+    pause
+    exit /b 1
+)
+
+if not exist dist\OHScrcpy\_internal\hdc.exe (
+    echo ------------------------------------
+    echo [警告] 未找到打包的 hdc.exe
+    echo ------------------------------------
+    pause
+    exit /b 1
+)
+
+if not exist dist\OHScrcpy\_internal\libusb_shared.dll (
+    echo --------------------------------------
+    echo [警告] 未找到打包的 libusb_shared.dll
+    echo --------------------------------------
     pause
     exit /b 1
 )
@@ -185,3 +244,4 @@ echo =============================================
 echo 输出目录：dist\OHScrcpy\
 echo.
 pause
+goto:eof

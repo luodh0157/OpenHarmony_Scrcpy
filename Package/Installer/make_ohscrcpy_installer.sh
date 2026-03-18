@@ -5,7 +5,8 @@ echo "================================================================"
 echo "    OpenHarmony OHScrcpy 安装程序制作脚本（Linux/macOS平台）    "
 echo "================================================================"
 
-VERSION="v1.5.0"
+VERSION="v1.6.0"
+
 OS="$(uname -s)"
 case "${OS}" in
     Linux*)     OS_TYPE="Linux";;
@@ -13,7 +14,29 @@ case "${OS}" in
     *)          OS_TYPE="UNKNOWN"
 esac
 
-echo "[信息] 检测到操作系统: ${OS_TYPE}"
+ARCH="$(uname -m)"
+case "${ARCH}" in
+    x86_64 | amd64)
+        echo "这是64位 x86系统（x64）"
+        ARCH="x64"
+        ;;
+    i[3456]86 | i86pc)
+        echo "这是32位 x86系统（x86）"
+        ARCH="x86"
+        ;;
+    aarch64 | arm64)
+        echo "这是64位 ARM系统（arm64）"
+        ARCH="arm64"
+        ;;
+    armv7l | armv6l | armv7)
+        echo "这是32位 ARM系统（arm）"
+        ARCH="arm"
+        ;;
+    *)
+        echo "未知架构：$ARCH"
+        ;;
+esac
+echo "[信息] 检测到操作系统: ${OS_TYPE}, 架构：${ARCH}"
 
 echo "检查依赖..."
 DIST_DIR="dist/OHScrcpy"
@@ -48,13 +71,13 @@ cp install_ohscrcpy.sh "${DIST_DIR}"
 cp uninstall_ohscrcpy.sh "${DIST_DIR}"
 
 cd "${DIST_DIR}"
-zip -r -q -9 ../../${OUTPUT_DIR}/OHScrcpy_Setup_${OS_TYPE}_${VERSION}.zip ./*
+zip -r -q -9 ../../${OUTPUT_DIR}/OHScrcpy_Setup_${OS_TYPE}_${ARCH}_${VERSION}.zip ./*
 cd -
 echo "打包完成"
 
 # 验证打包结果
 echo "验证打包结果..."
-if [ ! -f "${OUTPUT_DIR}/OHScrcpy_Setup_${OS_TYPE}_${VERSION}.zip" ]; then
+if [ ! -f "${OUTPUT_DIR}/OHScrcpy_Setup_${OS_TYPE}_${ARCH}_${VERSION}.zip" ]; then
     echo "错误: 打包失败，未生成压缩包文件"
     read -p "按任意键继续..."
     exit 1
@@ -100,7 +123,7 @@ generate_hash() {
 }
 
 # 生成哈希文件
-HASH_FILE="output/${OS_TYPE}/OHScrcpy_Setup_${OS_TYPE}_hash.txt"
+HASH_FILE="output/${OS_TYPE}/OHScrcpy_Setup_${OS_TYPE}_${ARCH}_hash.txt"
 if generate_hash "dist/OHScrcpy/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
     echo "[完成] 哈希文件已生成：${HASH_FILE}"
     echo ""

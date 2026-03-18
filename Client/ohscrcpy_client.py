@@ -6,6 +6,7 @@ OpenHarmony_Scrcpy 客户端
 import sys
 import os
 import platform
+import shutil
 import subprocess
 import socket
 import threading
@@ -89,26 +90,74 @@ class HDCCommandExecutor:
     
     def __init__(self, device_sn: Optional[str] = None):
         self.device_sn = device_sn
+        self.log_title = "设备命令执行器"
         self.hdc_path = self._find_hdc_path()
         self.async_processes = {}  # 存储异步进程
-        self.log_title = "设备命令执行器"
+    
+    def _get_arch_name(self) -> str:
+        """获取当前系统的 CPU 架构"""
+        machine = platform.machine().lower()
+        if machine in ('i386', 'i686', 'x86'):
+            return 'x86'
+        elif machine in ('x86_64', 'amd64'):
+            return 'x64'
+        elif machine in ('aarch64', 'arm64'):
+            return 'arm64'
+        else:
+            print_log(LogLevel.WARN, self.log_title, f"未知的CPU架构: [{machine}]")
+            return ""
+    
+    def _get_self_hdc_relpath(self) -> str:
+        """获取当前程序自带的hdc工具相对路径"""
+        arch = self._get_arch_name()
+        system = platform.system()
+        if system == 'Windows':
+            return os.path.join('hdc', system, arch, 'hdc.exe')
+        elif system in ('Linux', 'Darwin'):
+            return os.path.join('hdc', system, arch, 'hdc')
+        else:
+            print_log(LogLevel.WARN, self.log_title, f"未知的OS平台: [{system}]")
+            return 'hdc'
+    
+    def _get_hdc_filename(self) -> str:
+        """获取当hdc工具名称"""
+        system = platform.system()
+        if system == 'Windows':
+            return 'hdc.exe'
+        elif system in ('Linux', 'Darwin'):
+            return 'hdc'
+        else:
+            print_log(LogLevel.WARN, self.log_title, f"未知的OS平台: [{system}]")
+            return 'hdc'
+    
+    def _get_self_hdc_abspath(self) -> str:
+        """获取当前程序自带的hdc工具绝对路径"""
+        # 是否运行于PyInstaller打包环境中
+        if hasattr(sys, '_MEIPASS'):
+            abspath = sys._MEIPASS
+            abspath += os.sep + self._get_hdc_filename()
+        else:
+            # 开发环境（当前目录）
+            abspath = os.path.dirname(os.path.abspath(__file__))
+            relpath = self._get_self_hdc_relpath()
+            abspath += os.sep + relpath
+        return abspath
     
     def _find_hdc_path(self) -> str:
-        """查找hdc工具路径"""
-        possible_paths = ["hdc", "hdc.exe", "/usr/bin/hdc", "/usr/local/bin/hdc"]
-        
-        for path in possible_paths:
-            try:
-                subprocess.run([path, "--version"], 
-                             capture_output=True, 
-                             text=True,
-                             timeout=2,
-                             check=False)
-                return path
-            except:
-                continue
-        
-        return "hdc"
+        """获取hdc工具路径（支持PyInstaller打包）"""
+        filepath = self._get_self_hdc_abspath()
+        if os.path.isfile(filepath):
+            print_log(LogLevel.INFO, self.log_title, f"程序自带hdc工具: [{filepath}]")
+            return os.path.abspath(filepath)
+
+        # 在系统PATH中查找hdc
+        hdc_in_path = shutil.which("hdc")
+        if hdc_in_path:
+            print_log(LogLevel.INFO, self.log_title, f"系统自带hdc工具: [{hdc_in_path}]")
+            return os.path.abspath(hdc_in_path)
+
+        print_log(LogLevel.WARN, self.log_title, f"hdc工具不存在")
+        return ""
     
     def assemble_command(self, args: List[str], need_sn: bool = True) -> str:
         cmd = [self.hdc_path]
@@ -216,17 +265,18 @@ class HDCCommandExecutor:
     
     def execute_async_in_shell(self, args: List[str], need_sn: bool = True, title="Command Output", keep_open=False) -> Optional[subprocess.Popen]:
         """新开终端窗口异步执行hdc命令（用于启动持续运行的服务），可以查看日志，启动较慢"""
-        command = " ".join(self.assemble_command(args, need_sn))
+        hdc_cmd = self.assemble_command(args, need_sn)
         
         system = platform.system()
         if system == "Windows":
             # Windows平台
             if keep_open:
-                cmd = f'start "{title}" cmd /k "{command}"'
+                shell_cmd = ["start", f"{title}", "cmd", "/k"]
+                shell_cmd.extend(hdc_cmd)
             else:
-                cmd = f'start "{title}" cmd /c "{command}"'
-            
-            process = subprocess.Popen(cmd, shell=True)
+                shell_cmd = ["start", f"{title}", "cmd", "/c"]
+                shell_cmd.extend(hdc_cmd)
+            process = subprocess.Popen(shell_cmd, shell=True)
             
         elif system == "Linux" or system == "Darwin":
             # Linux/macOS平台
@@ -236,26 +286,26 @@ class HDCCommandExecutor:
             
             # 构建终端命令
             if keep_open:
-                cmd = f"{command}; echo 'Press Enter to exit...'; read"
+                shell_cmd = f"{hdc_cmd}; echo 'Press Enter to exit...'; read"
             else:
-                cmd = command
+                shell_cmd = hdc_cmd
                 
             if terminal == "gnome-terminal":
-                cmd = " ".join(["gnome-terminal", "--title", title, "--", "bash", "-c", cmd])
-                process = subprocess.Popen(cmd)
+                shell_cmd = " ".join(["gnome-terminal", "--title", title, "--", "bash", "-c", shell_cmd])
+                process = subprocess.Popen(shell_cmd)
             elif terminal == "konsole":
-                cmd = " ".join(["konsole", "--title", title, "-e", "bash", "-c", cmd])
-                process = subprocess.Popen(cmd)
+                shell_cmd = " ".join(["konsole", "--title", title, "-e", "bash", "-c", shell_cmd])
+                process = subprocess.Popen(shell_cmd)
             elif terminal == "xterm":
-                cmd = " ".join(["xterm", "-title", title, "-e", f"bash -c '{terminal_cmd}'"])
-                process = subprocess.Popen(cmd)
+                shell_cmd = " ".join(["xterm", "-title", title, "-e", f"bash -c '{shell_cmd}'"])
+                process = subprocess.Popen(shell_cmd)
             elif terminal == "terminator":
-                cmd = " ".join(["terminator", "-T", title, "-e", f"bash -c '{cmd}'"])
-                process = subprocess.Popen(cmd)
+                shell_cmd = " ".join(["terminator", "-T", title, "-e", f"bash -c '{shell_cmd}'"])
+                process = subprocess.Popen(shell_cmd)
             elif terminal == "osascript":  # macOS使用AppleScript
                 applescript = f'''
                 tell application "Terminal"
-                    do script "{command}"
+                    do script "{shell_cmd}"
                     activate
                 end tell
                 '''
@@ -264,14 +314,14 @@ class HDCCommandExecutor:
             else:
                 # 尝试通用方式
                 term_cmd = os.environ.get('TERMINAL', 'xterm')
-                cmd = " ".join([term_cmd, "-e", f"bash -c '{cmd}'"])
-                process = subprocess.Popen()
+                shell_cmd = " ".join([term_cmd, "-e", f"bash -c '{shell_cmd}'"])
+                process = subprocess.Popen(shell_cmd)
         else:
             print_log(LogLevel.FATAL, self.log_title, f"异步Shell执行: Unsupported platform [{system}]")
             process = None
         
         
-        print_log(LogLevel.DEBUG, self.log_title, f"异步Shell执行: [{cmd}]")
+        print_log(LogLevel.DEBUG, self.log_title, f"异步Shell执行: [{shell_cmd}]")
         # 保存进程引用，以便后续管理
         if process: 
             process_id = len(self.async_processes)
@@ -432,7 +482,7 @@ class ServerManager:
         # 启动服务（异步执行）
         device_sn = self.hdc.get_current_device()
         #self.server_process = self.hdc.execute_async_in_process(["shell", "/system/bin/ohscrcpy_server", "-p", f"{port}"])
-        self.server_process = self.hdc.execute_async_in_shell(["shell", "/system/bin/ohscrcpy_server", "-p", f"{port}"], title = f"ohscrcpy_server {device_sn}")
+        self.server_process = self.hdc.execute_async_in_shell(["shell", "/system/bin/ohscrcpy_server", "-p", f"{port}"], title=f"ohscrcpy_server {device_sn}")
         
         if self.server_process:
             print_log(LogLevel.INFO, self.log_title, f"启动命令已执行")
@@ -1957,7 +2007,7 @@ class OHScrcpyGUI:
                 # 转换为PIL图像
                 try:
                     from PIL import Image
-                    pil_img = Image.fromarray(frame, 'RGB')
+                    pil_img = Image.fromarray(frame) #'RGB'
                 except Exception as e:
                     print_log(LogLevel.ERROR, self.log_title, f"创建PIL图像失败: {e}")
                     self.root.after(10, self._update_video_display)
@@ -2413,7 +2463,7 @@ class OHScrcpyGUI:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = os.path.join(debug_dir, f"debug_{timestamp}.png")
                 
-                pil_img = Image.fromarray(self.current_frame, 'RGB')
+                pil_img = Image.fromarray(self.current_frame) #'RGB'
                 pil_img.save(filename)
                 
                 print_log(LogLevel.INFO, debug_frame_title, f"调试帧保存在: {filename}")

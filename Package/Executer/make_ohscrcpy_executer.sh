@@ -10,12 +10,43 @@ echo ""
 
 OS="$(uname -s)"
 case "${OS}" in
-    Linux*)     OS_TYPE="Linux";;
-    Darwin*)    OS_TYPE="macOS";;
-    *)          OS_TYPE="UNKNOWN"
+    Linux*)
+        OS_TYPE="Linux"
+        OS_NAME="Linux"
+        ;;
+    Darwin*)
+        OS_TYPE="macOS"
+        OS_NAME="Darwin"
+        ;;
+    *)
+        OS_TYPE="UNKNOWN"
+        OS_NAME="${OS}"
 esac
 
-echo "[信息] 检测到操作系统: ${OS_TYPE}"
+ARCH="$(uname -m)"
+case "${ARCH}" in
+    x86_64 | amd64)
+        echo "这是64位 x86系统（x64）"
+        ARCH="x64"
+        ;;
+    i[3456]86 | i86pc)
+        echo "这是32位 x86系统（x86）"
+        ARCH="x86"
+        ;;
+    aarch64 | arm64)
+        echo "这是64位 ARM系统（arm64）"
+        ARCH="arm64"
+        ;;
+    armv7l | armv6l | armv7)
+        echo "这是32位 ARM系统（arm）"
+        ARCH="arm"
+        ;;
+    *)
+        echo "未知架构：$ARCH"
+        ;;
+esac
+
+echo "[信息] 检测到操作系统: ${OS_TYPE}, 架构：${ARCH}"
 
 if ! command -v python3 &> /dev/null; then
     echo "-----------------------------------------"
@@ -101,6 +132,22 @@ if [ ! -f "ohscrcpy_server.cfg" ]; then
     exit 1
 fi
 
+if [ ! -f "hdc/${OS_NAME}/${ARCH}/hdc" ]; then
+    echo "----------------------------------------------------"
+    echo -e "\033[33m[警告] 未找到 hdc/${OS_NAME}/${ARCH}/hdc，请确保该文件存在\033[0m"
+    echo "----------------------------------------------------"
+    read -p "按任意键继续..."
+    exit 1
+fi
+
+if [ ! -f "hdc/${OS_NAME}/${ARCH}/libusb_shared.so" ]; then
+    echo "----------------------------------------------------"
+    echo -e "\033[33m[警告] 未找到 hdc/${OS_NAME}/${ARCH}/libusb_shared.so，请确保该文件存在\033[0m"
+    echo "----------------------------------------------------"
+    read -p "按任意键继续..."
+    exit 1
+fi
+
 if [ ! -f "app.ico" ] && [ ! -f "app.icns" ]; then
     echo "----------------------------------------"
     echo -e "\033[33m[警告] 未找到图标文件 app.ico 或 app.icns\033[0m"
@@ -153,6 +200,14 @@ fi
 
 if [ -f "HUAWEI/ohscrcpy_server" ]; then
     PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"HUAWEI/ohscrcpy_server:HUAWEI\""
+fi
+
+if [ -f "hdc/${OS_NAME}/${ARCH}/hdc" ]; then
+    PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"hdc/${OS_NAME}/${ARCH}/hdc:HUAWEI\""
+fi
+
+if [ -f "hdc/${OS_NAME}/${ARCH}/libusb_shared.so" ]; then
+    PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"hdc/${OS_NAME}/${ARCH}/libusb_shared.so:HUAWEI\""
 fi
 
 if [ -f "${ICON_FILE}" ]; then
@@ -235,7 +290,7 @@ generate_hash() {
 # 生成哈希文件
 HASH_FILE="output/${OS_TYPE}/OHScrcpy_hash.txt"
 if generate_hash "dist/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
-    echo "[完成] 哈希文件已生成：OHScrcpy_hash.txt"
+    echo "[完成] 哈希文件已生成：${HASH_FILE}"
     echo ""
     echo "生成的哈希值："
     cat "${HASH_FILE}"

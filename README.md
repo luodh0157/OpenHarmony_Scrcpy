@@ -6,7 +6,7 @@
 - **计算机侧（客户端）**：基于Python跨平台实现
 - **OpenHarmony设备侧（服务端）**：基于OpenHarmony系统C-API实现
 
-![系统架构图.png](https://raw.gitcode.com/user-images/assets/8887101/1dc7141a-783b-47af-aef9-8d46674e45f5/系统架构图.png '系统架构图.png')
+![系统架构图.png](./系统架构图.png '系统架构图.png')
 
 ## 特性
 
@@ -24,17 +24,11 @@
 ### 计算机侧
 - **操作系统**：Windows/Linux/macOS
 - **Python版本**：Python 3.7或更高版本
-- **依赖库**：
-   - `numpy`
-   - `pillow`
-   - `av` (PyAV)
-   - `tkinter` (通常Python自带)
-- **网络**：支持TCP/IP连接
+- **网络**：支持USB hdc连接
 
 ### OpenHarmony设备侧
 - **系统版本**：OpenHarmony 5.0或更高版本
 - **权限**：需要USB调试权限
-- **服务端**：需要运行对应的投屏服务端程序
 
 ## 开发指南
 
@@ -42,8 +36,13 @@
 ```
 OpenHarmony_Scrcpy/
 ├── Client/              # 客户端目录
+├──── hdc/               # 各平台hdc工具
 ├──── ohscrcpy_client.py # 客户端程序入口
-├──── README.md  # 客户端说明文档
+├──── README.md          # 客户端说明文档
+├── Package               # 打包工具
+├──── Executer/           # 自解压打包工具
+├──── Installer/          # 安装包打包工具
+├──── 打包工具使用说明.md # 打包使用说明
 ├── Server/                       # 服务端目录
 ├──── bin/                        # 预置二进制可执行文件目录
 ├──── BUILD.gn                    # 服务端在OpenHarmony系统下的编译配置脚本
@@ -56,8 +55,9 @@ OpenHarmony_Scrcpy/
 ├──── README.md                   # 服务端说明文档
 ├──── start_ohscrcpy_server.bat   # 服务端启动脚本（Windows）
 ├──── start_ohscrcpy_server.sh    # 服务端启动脚本（Linux）
-├── LICENSE    # LICENSE说明
-└── README.md  # 说明文档
+├── ChangeLog.txt # 版本修改记录
+├── LICENSE       # LICENSE说明
+└── README.md     # 说明文档
 ```
 
 ### 核心模块
@@ -70,16 +70,17 @@ OpenHarmony_Scrcpy/
 
 #### 客户端
    1. **HDCCommandExecutor**：HDC命令执行器
-   2. **DeviceManager**：设备管理器
-   3. **H264Decoder**：H.264视频解码器
-   4. **VideoStreamClient**：视频流客户端
-   5. **DeviceController**：设备控制器
-   6. **OHScrcpyGUI**：图形用户界面
+   2. **ServerManager**：服务端管理器
+   3. **DeviceManager**：设备管理器
+   4. **H264Decoder**：H.264视频解码器
+   5. **VideoStreamClient**：视频流客户端
+   6. **DeviceController**：设备控制器
+   7. **OHScrcpyGUI**：图形用户界面
 
 ### 协议说明
    程序使用自定义TCP协议进行通信：
-- 数据包格式：4字节包类型 + 4字节数据长度 + 数据内容
-- 包类型：心跳、SPS、PPS、关键帧、普通帧、配置信息
+- **数据包格式**：4字节包类型 + 4字节数据长度 + 数据内容
+- **包类型**：心跳、SPS、PPS、关键帧、普通帧、配置信息
 
 ### 编译步骤
    客户端是python实现，不涉及编译，只有服务端涉及编译。服务端编译方法如下：
@@ -104,46 +105,31 @@ OpenHarmony_Scrcpy/
    无需手动安装，客户端（计算机侧）发起投屏时会自动安装服务端（OpenHarmony设备侧）
 
 ### 计算机侧安装
+   运行安装包，根据提示安装即可完成安装。
 
-#### 1. 安装Python依赖
-```bash
-pip install numpy pillow av
-```
-
-#### 2. 安装HDC工具
-   确保HDC（HarmonyOS Device Connector）工具已安装并添加到系统PATH
-
-##### Windows
-   1. 从OpenHarmony官网下载HDC工具
-   2. 将hdc.exe所在目录添加到系统PATH
-
-##### Linux/macOS
-   通常已包含在OpenHarmony SDK中，或着从官网下载并安装
 
 ## 使用方法
 
 ### 1. 连接设备
-   1. **USB连接**：
+   **USB连接**：
       - 使用USB数据线连接OpenHarmony设备到计算机
       - 在设备上启用USB调试模式
       - 首次连接时，需要在设备上授权调试权限
-   2. **Wi-Fi连接**：
-      - 确保设备和计算机在同一局域网或者用网线将设备和计算机直连
 
 ### 2. 启动OpenHarmony设备侧服务
    无需手动启动，客户端（计算机侧）发起投屏时会自动拉起服务端（OpenHarmony设备侧）
 
 ### 3. 启动计算机端GUI程序
 ```bash
-python ohscrcpy_client.py
+OHScrcpy
 ```
    1. 运行程序后，主界面将显示
    2. 点击`刷新`按钮扫描可用设备
    3. 从`设备列表`中选择要连接的设备
    4. 点击`连接`按钮开始投屏
 
-![alt text](./Client/客户端启动GUI.png)
-![alt text](./Client/客户端投屏GUI.png)
+![客户端启动GUI](./Client/客户端启动GUI.png)
+![客户端投屏GUI](./Client/客户端投屏GUI.png)
 
 ### 4. 基本操作
 
@@ -173,7 +159,7 @@ python ohscrcpy_client.py
 
 ### 视频流配置
    程序默认使用以下配置：
-- **分辨率**：设备原始分辨率
+- **分辨率**：设备默认分辨率
 - **帧率**：30 fps
 - **码率**：1.5 Mbps
 - **编码格式**：H.264
@@ -245,5 +231,3 @@ self.video_client = VideoStreamClient(on_frame_decoded=self._on_frame_decoded, d
 本工具仅供学习和研究使用，请勿用于非法用途。使用本工具造成的任何后果，开发者概不负责。
 
 ---
-
-**注意**：本软件需要与OpenHarmony设备端的对应服务端程序配合使用。请确保设备端已正确安装并运行服务端程序。

@@ -6,8 +6,8 @@
 [Setup]
 ; 应用程序信息
 AppName=OpenHarmony OHScrcpy
-AppVersion=1.5.0
-AppVerName=OHScrcpy v1.5.0
+AppVersion=1.6.0
+AppVerName=OHScrcpy v1.6.0
 AppPublisher=OHScrcpy开源项目组
 AppPublisherURL=https://gitcode.com/luodh0157/OpenHarmony_Scrcpy
 AppSupportURL=https://gitcode.com/luodh0157/OpenHarmony_Scrcpy/issues
@@ -29,7 +29,7 @@ AlwaysShowGroupOnReadyPage=yes
 
 ; 输出设置
 outputDir=.\output\Windows\
-outputBaseFilename=OHScrcpy_Setup_v1.5.0
+outputBaseFilename=OHScrcpy_Setup_v1.6.0
 SetupIconFile=.\resources\app.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -47,13 +47,13 @@ WizardImageStretch=no
 PrivilegesRequired=lowest
 
 ; 版本信息
-VersionInfoVersion=1.5.0.0
+VersionInfoVersion=1.6.0.0
 VersionInfoCompany=OHScrcpy开源项目组
 VersionInfoDescription=OpenHarmony屏幕镜像工具
 VersionInfoCopyright=基于GPLv3协议开源
 VersionInfoProductName=OpenHarmony OHScrcpy
-VersionInfoProductVersion=1.5.0.0
-VersionInfoProductTextVersion=v1.5.0
+VersionInfoProductVersion=1.6.0.0
+VersionInfoProductTextVersion=v1.6.0
 
 ; 安装模式
 UninstallDisplayIcon={app}\OHScrcpy.exe
@@ -256,7 +256,7 @@ begin
   
   // 自定义欢迎页面文本
   WizardForm.WelcomeLabel2.Caption := 
-    '此程序将安装OpenHarmony OHScrcpy v1.5.0 到您的计算机。' + #13#10#13#10 +
+    '此程序将安装OpenHarmony OHScrcpy v1.6.0 到您的计算机。' + #13#10#13#10 +
     'OpenHarmony OHScrcpy 是一个开源的OpenHarmony系统屏幕镜像工具' + #13#10#13#10 +
     '安装前请注意：' + #13#10 +
     '• 确保OpenHarmony设备已启用USB调试' + #13#10 +

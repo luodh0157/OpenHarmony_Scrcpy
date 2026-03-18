@@ -10,6 +10,35 @@ echo     OpenHarmony OHScrcpy 安装程序制作脚本（Windows平台）
 echo ===========================================================
 echo.
 
+set VERSION="v1.6.0"
+
+::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
+if defined PROCESSOR_ARCHITEW6432 (
+    set "ARCH=AMD64"
+) else (
+    set "ARCH=%PROCESSOR_ARCHITECTURE%"
+)
+
+if /i "%ARCH%"=="AMD64" (
+    echo 这是64位 x86系统（x64）
+    set "ARCH=x64"
+) else if /i "%ARCH%"=="x86" (
+    echo 这是32位 x86系统（x86）
+    set "ARCH=x86"
+) else if /i "%ARCH%"=="IA64" (
+    echo 这是Intel Itanium 64位系统（i64）
+    set "ARCH=i64"
+) else if /i "%ARCH%"=="ARM64" (
+    echo 这是64位 ARM系统（arm64）
+    set "ARCH=arm64"
+) else if /i "%ARCH%"=="ARM" (
+    echo 这是32位 ARM系统（arm）
+    set "ARCH=arm"
+) else (
+    echo 未知架构：%ARCH%
+)
+echo [信息] 检测到操作系统: Windows, 架构：%ARCH%
+
 set ISCC_PATH=
 where ISCC >nul 2>nul
 if %errorlevel% neq 0 (
@@ -88,7 +117,7 @@ echo 安装程序位置：%cd%\output\Windows\
 
 
 echo [信息] 生成安装包信息...
-echo OHScrcpy v1.5.0 安装包> output\Windows\package_info.txt
+echo OHScrcpy %VERSION% 安装包> output\Windows\package_info.txt
 echo ==============================>> output\Windows\package_info.txt
 echo 生成时间：%date% %time%>> output\Windows\package_info.txt
 echo.>> output\Windows\package_info.txt
@@ -101,17 +130,17 @@ dir docs\* /b >> output\Windows\package_info.txt
 echo [信息] 生成安装程序哈希值...
 where certutil >nul 2>nul
 if %errorlevel% equ 0 (
-    echo 安装程序哈希值：>> output\Windows\OHScrcpy_setup_hash.txt
-    echo ==============================>> output\Windows\OHScrcpy_setup_hash.txt
+    echo 安装程序哈希值：>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
+    echo ==============================>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
     for %%f in (output\Windows\*.exe) do (
-        echo 文件：%%f>> output\Windows\OHScrcpy_setup_hash.txt
-        certutil -hashfile "output\Windows\%%f" MD5>> output\Windows\OHScrcpy_setup_hash.txt 2>nul
-        echo.>> output\Windows\OHScrcpy_setup_hash.txt
-        certutil -hashfile "output\Windows\%%f" SHA256>> output\Windows\OHScrcpy_setup_hash.txt 2>nul
-        echo.>> output\Windows\OHScrcpy_setup_hash.txt
-        echo ==============================>> output\Windows\OHScrcpy_setup_hash.txt
+        echo 文件：%%f>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
+        certutil -hashfile "output\Windows\%%f" MD5>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt 2>nul
+        echo.>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
+        certutil -hashfile "output\Windows\%%f" SHA256>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt 2>nul
+        echo.>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
+        echo ==============================>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
     )
-    echo [完成] 哈希文件已生成：output\Windows\OHScrcpy_setup_hash.txt
+    echo [完成] 哈希文件已生成：output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
 )
 
 echo.
