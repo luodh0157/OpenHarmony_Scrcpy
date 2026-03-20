@@ -9,7 +9,7 @@
 - **自适应分辨率**：自动调整显示尺寸，保持原始比例
 
 ## 系统要求
-- **系统版本**：OpenHarmony 5.0或更高版本
+- **系统版本**：OpenHarmony 5.0或更高版本（**root版本**）
 - **权限**：需要USB调试权限
 
 ## 开发指南
@@ -38,6 +38,7 @@
    6. 在OpenHarmony全仓代码的根目录下，执行如下编译命令：
    ```bash
    ./build.sh --product-name rk3568 --build-target ohscrcpy_server
+   ./build.sh --product-name rk3568 --build-target ohscrcpy_server --fast-rebuild （`--fast-rebuild`是快速编译参数，没有修改BUILD.gn和bundle.json时可用）
    ```
    7. 编译产物位于`out/rk3568/multimedia/player_framework/`目录下的`ohscrcpy_server`
 

@@ -13,46 +13,32 @@
 - **服务自动安装和启动**：服务端自动安装和启动
 
 ## 系统要求
-- **操作系统**：Windows 10/11、Linux、macOS
+
+### 计算机侧
+- **操作系统**：Windows/Linux/macOS
 - **Python版本**：Python 3.7或更高版本
-- **依赖库**：
-   - `numpy`
-   - `pillow`
-   - `av` (PyAV)
-   - `tkinter` (通常Python自带)
-- **网络**：支持TCP/IP连接
+- **网络**：支持USB hdc连接
+
+### OpenHarmony设备侧
+- **系统版本**：OpenHarmony 5.0或更高版本（**root版本**）
+- **权限**：需要USB调试权限
 
 ## 开发指南
 
 ### 核心模块
    1. **HDCCommandExecutor**：HDC命令执行器
-   2. **DeviceManager**：设备管理器
-   3. **H264Decoder**：H.264视频解码器
-   4. **VideoStreamClient**：视频流客户端
-   5. **DeviceController**：设备控制器
-   6. **OHScrcpyGUI**：图形用户界面
+   2. **ServerManager**：服务端管理器
+   3. **DeviceManager**：设备管理器
+   4. **H264Decoder**：H.264视频解码器
+   5. **VideoStreamClient**：视频流客户端
+   6. **DeviceController**：设备控制器
+   7. **OHScrcpyGUI**：图形用户界面
 
 ### 协议说明
    程序使用自定义TCP协议进行通信：
-- 数据包格式：4字节包类型 + 4字节数据长度 + 数据内容
-- 包类型：心跳、SPS、PPS、关键帧、普通帧、配置信息
+- **数据包格式**：4字节包类型 + 4字节数据长度 + 数据内容
+- **包类型**：心跳、SPS、PPS、关键帧、普通帧、配置信息
 
-### 安装步骤
-
-#### 1. 安装Python依赖
-```bash
-pip install numpy pillow av
-```
-
-#### 2. 安装HDC工具
-   确保HDC（HarmonyOS Device Connector）工具已安装并添加到系统PATH
-
-##### Windows
-   1. 从OpenHarmony官网下载HDC工具
-   2. 将hdc.exe所在目录添加到系统PATH
-
-##### Linux/macOS
-   通常已包含在OpenHarmony SDK中，或着从官网下载并安装
 
 ## 使用方法
 
@@ -61,13 +47,13 @@ pip install numpy pillow av
       - 使用USB数据线连接OpenHarmony设备到计算机
       - 在设备上启用USB调试模式
       - 首次连接时，需要在设备上授权调试权限
-   2. **Wi-Fi连接**：
-      - 确保设备和计算机在同一局域网或者用网线将设备和计算机直连
+   2. **网线/Wi-Fi连接**：
+      - 确保设备和计算机在同一局域网（有线/无线）或者用网线将设备和计算机直连
 
-### 2. 启动服务端
-   无需手动启动，客户端（计算机侧）发起投屏时会自动安装和拉起服务端（OpenHarmony设备侧）
+### 2. 启动客户端GUI程序
+- **前置条件**：将`ohscrcpy_client.py`、`hdc`目录、`Server\bin\rk3568`目录下的`ohscrcpy_client`、`Server\`目录下的`ohscrcpy_client.cfg`拷贝到本地同一目录；如果是HarmonyOS设备，在本地目录下新建一个名为`HUAWEI`的目录，然后将`Server\bin\harmonyos`目录下的`ohscrcpy_client`拷贝到本地`HUAWEI`目录下的。
 
-### 3. 启动客户端GUI程序
+- 系统控制台（命令行环境）启动客户端
 ```bash
 python ohscrcpy_client.py
 ```
@@ -76,10 +62,10 @@ python ohscrcpy_client.py
    3. 从`设备列表`中选择要连接的设备
    4. 点击`连接`按钮开始投屏
 
-![alt text](客户端启动GUI.png)
-![alt text](客户端投屏GUI.png)
+![客户端启动GUI](客户端启动GUI.png)
+![客户端投屏GUI](客户端投屏GUI.png)
 
-### 4. 基本操作
+### 3. 基本操作
 
 #### 屏幕控制
 - **点击**：在视频区域`单击鼠标左键`
@@ -87,11 +73,12 @@ python ohscrcpy_client.py
 - **缩放**：程序自动适应窗口大小，保持原始比例
 
 #### 按键控制
-- **电源键**：点击`电源`按钮
-- **主页键**：点击`主页`按钮
-- **返回键**：点击`返回`按钮
-- **音量+**：点击`音量+`按钮
-- **音量-**：点击`音量-`按钮
+- **电源键**：点击**电源**按钮，唤醒/关闭屏幕显示
+- **主页键**：点击**主页**按钮，从前台应用返回桌面
+- **返回键**：点击**返回**按钮，返回上一UI页面
+- **解锁键**：点击**解锁**按钮，解锁屏幕
+- **音量+**：点击<strong>音量+</strong>按钮，增大音量
+- **音量-**：点击<strong>音量-</strong>按钮，减小音量
 
 ### 5. 快捷键
 
@@ -131,12 +118,17 @@ python ohscrcpy_client.py
 - 确保设备端服务端程序已运行
 - 检查防火墙设置
 
-#### 3. 视频卡顿
+#### 3. 服务端启动失败
+- 非root版本，无法安装和运行服务端程序
+- 服务端闪退，可执行文件和当前OpenHarmony系统不配套，需要重新源码编译
+- 服务端启动报错，基本上是编码器配置不匹配，需要查看服务端日志，分析确认具体不匹配的配置参数，然后修改参数并重新编译
+
+#### 4. 视频卡顿
 - 降低视频分辨率设置
 - 检查网络连接质量
 - 关闭不必要的后台程序
 
-#### 4. 解码错误
+#### 5. 解码错误
 - 确保已安装所有Python依赖
 - 检查`PyAV`库是否正确安装
 - 尝试重启程序
@@ -156,5 +148,3 @@ self.video_client = VideoStreamClient(on_frame_decoded=self._on_frame_decoded, d
    本工具仅供学习和研究使用，请勿用于非法用途。使用本工具造成的任何后果，开发者概不负责。
 
 ---
-
-**注意**：本软件需要与OpenHarmony设备端的对应服务端程序配合使用，请确保设备端已正确安装并运行服务端程序。

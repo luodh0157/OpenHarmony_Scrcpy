@@ -55,7 +55,7 @@
 #define PACKET_TYPE_CONFIG_DATA    0x00000006
 
 // 版本信息
-#define VERSION "v1.4"
+#define VERSION "v1.5"
 
 // H.264 NALU类型
 enum H264NaluType {
@@ -1259,10 +1259,6 @@ private:
             if (i < colorSpaces.size() - 1) std::cout << ", ";
         }
         std::cout << "]" << std::endl;
-
-        std::string capability;
-        display->GetDisplayCapability(capability);
-        std::cout << "  DisplayCapability: " << capability << std::endl;
         std::cout << "------------------------------------------------------" << std::endl;
     }
     
@@ -1401,7 +1397,7 @@ private:
                 // 定期打印统计信息
                 static uint64_t last_frame_count = 0;
                 uint64_t frame_count = encoder_.getFrameCount();
-                auto now = std::chrono::steady_clock::now();
+                now = std::chrono::steady_clock::now();
                 auto stat_elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_stat_time);
                 if ((stat_elapsed.count() >= 5) && (last_frame_count != frame_count)) {
                     std::cout << "Streaming active, frames sent: " << frame_count << std::endl;

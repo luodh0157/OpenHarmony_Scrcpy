@@ -27,7 +27,7 @@ from tkinter import ttk, messagebox
 # ==================== 常量定义 ====================
 AUTHOR = "luodh0157"
 PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
-VERSION = "v1.6"
+VERSION = "v1.7"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
 HEARTBEAT_TIMEOUT = 5.0  # 心跳超时时间（秒）
@@ -577,10 +577,12 @@ class ServerManager:
         
         # 3. 设置显示模式
         print_log(LogLevel.INFO, self.log_title, f"设置屏幕常亮...")
-        result = self.hdc.execute(["shell", "power-shell", "setmode", "602"])
+        result = self.hdc.execute(["shell", "power-shell", "setmode", str(602)])
+        result = self.hdc.execute(["shell", "power-shell", "timeout", "-o", str(86400000)])
+        result = self.hdc.execute(["shell", "hidumper", "-s", str(3301), "-a", "-t"])
         if not result["success"]:
             print_log(LogLevel.ERROR, self.log_title, f"设置屏幕常亮失败，继续执行...")
-        
+
         return True
 
 # ==================== 设备管理器 ====================
@@ -2155,6 +2157,7 @@ class OHScrcpyGUI:
             self.on_combobox_select(None)
         else:
             self.device_combo['values'] = []
+            self.device_combo.set('')
             self.update_device_status("未发现设备")
     
     def trigger_connection(self):

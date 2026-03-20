@@ -27,7 +27,7 @@
 - **网络**：支持USB hdc连接
 
 ### OpenHarmony设备侧
-- **系统版本**：OpenHarmony 5.0或更高版本
+- **系统版本**：OpenHarmony 5.0或更高版本（**root版本**）
 - **权限**：需要USB调试权限
 
 ## 开发指南
@@ -55,7 +55,7 @@ OpenHarmony_Scrcpy/
 ├──── README.md                   # 服务端说明文档
 ├──── start_ohscrcpy_server.bat   # 服务端启动脚本（Windows）
 ├──── start_ohscrcpy_server.sh    # 服务端启动脚本（Linux）
-├── ChangeLog.txt # 版本修改记录
+├── CHANGELOG.txt # 版本修改记录
 ├── LICENSE       # LICENSE说明
 └── README.md     # 说明文档
 ```
@@ -90,12 +90,13 @@ OpenHarmony_Scrcpy/
    repo sync -c --no-tags -j`nproc`
    ```
    2. 在`foundation/multimedia/player_framework/`目录下新建`OHScrcpy_Server`目录
-   3. 将本项目`Server`目录中的`BUILD.gn ohscrcpy_server.cpp ohscrcpy_server.cfg`拷贝至上一步新建的`OHScrcpy_Server`目录下
+   3. 将本项目`Server`目录中的`BUILD.gn`、`ohscrcpy_server.cpp`、`ohscrcpy_server.cfg`拷贝至上一步新建的`OHScrcpy_Server`目录下
    4. 将本项目`Server`目录中的`ohscrcpy_server.patch`拷贝至`foundation/multimedia/player_framework/`目录下
    5. 在`foundation/multimedia/player_framework/`目录下执行`git apply ohscrcpy_server.patch`，打上编译配置补丁
    6. 在OpenHarmony全仓代码的根目录下，执行如下编译命令：
    ```bash
    ./build.sh --product-name rk3568 --build-target ohscrcpy_server
+   ./build.sh --product-name rk3568 --build-target ohscrcpy_server --fast-rebuild （`--fast-rebuild`是快速编译参数，没有修改BUILD.gn和bundle.json时可用）
    ```
    7. 编译产物位于`out/rk3568/multimedia/player_framework/`目录下的`ohscrcpy_server`
 
@@ -120,9 +121,9 @@ OpenHarmony_Scrcpy/
    无需手动启动，客户端（计算机侧）发起投屏时会自动拉起服务端（OpenHarmony设备侧）
 
 ### 3. 启动计算机端GUI程序
-```bash
-OHScrcpy
-```
+   Windows系统双击`OHScrcpy.exe`，Linux/macOS系统命令行执行`OHScrcpy`，即可运行程序
+   
+   **说明**：OpenHarmony设备侧服务端会自动安装+启动，无需用户手动启动。
    1. 运行程序后，主界面将显示
    2. 点击`刷新`按钮扫描可用设备
    3. 从`设备列表`中选择要连接的设备
@@ -184,12 +185,17 @@ OHScrcpy
 - 确保设备端服务端程序已运行
 - 检查防火墙设置
 
-#### 3. 视频卡顿
+#### 3. 服务端启动失败
+- 非root版本，无法安装和运行服务端程序
+- 服务端闪退，可执行文件和当前OpenHarmony系统不配套，需要重新源码编译
+- 服务端启动报错，基本上是编码器配置不匹配，需要查看服务端日志，分析确认具体不匹配的配置参数，然后修改参数并重新编译
+
+#### 4. 视频卡顿
 - 降低视频分辨率设置
 - 检查网络连接质量
 - 关闭不必要的后台程序
 
-#### 4. 解码错误
+#### 5. 解码错误
 - 确保已安装所有Python依赖
 - 检查`PyAV`库是否正确安装
 - 尝试重启程序

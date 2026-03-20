@@ -2,16 +2,14 @@
 
 clear
 export LANG=en_US.UTF-8
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 last_exit_code=0
 
-install_scrcpy_server() {
+uninstall_scrcpy_server() {
     local device="$1"
     hdc -t "$device" target mount
-    hdc -t "$device" file send "$SCRIPT_DIR/bin/rk3568/ohscrcpy_server" /system/bin/
-    hdc -t "$device" shell chmod +x /system/bin/ohscrcpy_server
-    hdc -t "$device" file send "$SCRIPT_DIR/ohscrcpy_server.cfg" /system/etc/init/
+    hdc -t "$device" shell pkill ohscrcpy_server
+    hdc -t "$device" shell rm /system/bin/ohscrcpy_server
+    hdc -t "$device" shell rm /system/etc/init/ohscrcpy_server.cfg
     return $?
 }
 
@@ -19,7 +17,7 @@ while IFS= read -r line; do
     if echo "$line" | grep -q "Empty"; then
         continue
     else
-        install_scrcpy_server "$line"
+        uninstall_scrcpy_server "$line"
         last_exit_code=$?
     fi
 done < <(hdc list targets)

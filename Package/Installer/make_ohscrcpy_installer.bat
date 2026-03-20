@@ -10,7 +10,7 @@ echo     OpenHarmony OHScrcpy 安装程序制作脚本（Windows平台）
 echo ===========================================================
 echo.
 
-set VERSION="v1.6.0"
+set VERSION="v1.7.0"
 
 ::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
 if defined PROCESSOR_ARCHITEW6432 (
@@ -130,17 +130,17 @@ dir docs\* /b >> output\Windows\package_info.txt
 echo [信息] 生成安装程序哈希值...
 where certutil >nul 2>nul
 if %errorlevel% equ 0 (
-    echo 安装程序哈希值：>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
-    echo ==============================>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
+    echo 安装程序哈希值：>> output\Windows\OHScrcpy_setup_hash.txt
+    echo ==============================>> output\Windows\OHScrcpy_setup_hash.txt
     for %%f in (output\Windows\*.exe) do (
-        echo 文件：%%f>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
-        certutil -hashfile "output\Windows\%%f" MD5>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt 2>nul
-        echo.>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
-        certutil -hashfile "output\Windows\%%f" SHA256>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt 2>nul
-        echo.>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
-        echo ==============================>> output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
+        echo 文件：%%f>> output\Windows\OHScrcpy_setup_hash.txt
+        certutil -hashfile "output\Windows\%%f" MD5>> output\Windows\OHScrcpy_setup_hash.txt 2>nul
+        echo.>> output\Windows\OHScrcpy_setup_hash.txt
+        certutil -hashfile "output\Windows\%%f" SHA256>> output\Windows\OHScrcpy_setup_hash.txt 2>nul
+        echo.>> output\Windows\OHScrcpy_setup_hash.txt
+        echo ==============================>> output\Windows\OHScrcpy_setup_hash.txt
     )
-    echo [完成] 哈希文件已生成：output\Windows\OHScrcpy_setup_Windows_%ARCH%_hash.txt
+    echo [完成] 哈希文件已生成：output\Windows\OHScrcpy_setup_hash.txt
 )
 
 echo.

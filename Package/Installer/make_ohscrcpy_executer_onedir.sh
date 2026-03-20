@@ -291,7 +291,7 @@ echo "生成的文件："
 ls -la "dist/OHScrcpy/"
 
 echo "[信息] 生成文件哈希值..."
-mkdir -p "output/${OS_TYPE}"
+mkdir -p "output/${OS_TYPE}/${ARCH}"
 
 generate_hash() {
     local file="$1"
@@ -328,7 +328,7 @@ generate_hash() {
 }
 
 # 生成哈希文件
-HASH_FILE="output/${OS_TYPE}/OHScrcpy_dir_hash.txt"
+HASH_FILE="output/${OS_TYPE}/${ARCH}/OHScrcpy_dir_hash.txt"
 if generate_hash "dist/OHScrcpy/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
     echo "[完成] 哈希文件已生成：${HASH_FILE}"
     echo ""

@@ -18,7 +18,7 @@
 ## Executer打包方法
 
 ### 1. 准备依赖资源文件
-  将`Client/ohscrcpy_client.py`, `Server/bin/rk3568/ohscrcpy_server`, `Server/ohscrcpy_server.cfg`三个文件拷贝到`Package/Installer`目录下，将`Server/bin/harmonyos/ohscrcpy_server`拷贝到`Package/Installer/HUAWEI`目录下。
+  将`Client/ohscrcpy_client.py`、`Server/bin/rk3568/ohscrcpy_server`、`Server/ohscrcpy_server.cfg`三个文件拷贝到`Package/Installer`目录下，将`Server/bin/harmonyos/ohscrcpy_server`拷贝到`Package/Installer/HUAWEI`目录下。
 
 ### 2. 运行打包脚本
   在`Package/Installer`目录下，运行`make_ohscrcpy_executer_onedir`打包脚本，开始自动进行可执行文件打包。
@@ -30,7 +30,7 @@
   
   **注意**：
   
-  (1) Windows平台使用Inno Setup**免签名**方式制作安装包，制做安装包和安装过程中会被杀毒软件误认为是病毒而拦截，请执行该脚本前暂时**关闭杀毒软件**。
+  (1) Windows平台使用**Inno Setup免签名**方式制作安装包，制做安装包和安装过程中会被杀毒软件误认为是病毒而拦截，请执行该脚本前暂时**关闭杀毒软件**。
   
   (2) Windows平台脚本执行过程中会自动拉起Inno Setup安装包制作工具的GUI操作界面，需要**用户点击**`开始`按钮，开始自动制作；另外，制作完成后会自动拉起试安装GUI界面，用于调试安装向导，按照指引一步步完成操作即可。
   

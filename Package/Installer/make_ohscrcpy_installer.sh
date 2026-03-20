@@ -5,7 +5,7 @@ echo "================================================================"
 echo "    OpenHarmony OHScrcpy 安装程序制作脚本（Linux/macOS平台）    "
 echo "================================================================"
 
-VERSION="v1.6.0"
+VERSION="v1.7.0"
 
 OS="$(uname -s)"
 case "${OS}" in
@@ -66,7 +66,7 @@ fi
 echo "检查依赖完成"
 
 echo "开始打包..."
-OUTPUT_DIR="output/${OS_TYPE}"
+OUTPUT_DIR="output/${OS_TYPE}/${ARCH}"
 cp install_ohscrcpy.sh "${DIST_DIR}"
 cp uninstall_ohscrcpy.sh "${DIST_DIR}"
 
@@ -123,7 +123,7 @@ generate_hash() {
 }
 
 # 生成哈希文件
-HASH_FILE="output/${OS_TYPE}/OHScrcpy_Setup_${OS_TYPE}_${ARCH}_hash.txt"
+HASH_FILE="${OUTPUT_DIR}/OHScrcpy_Setup_${OS_TYPE}_${ARCH}_hash.txt"
 if generate_hash "dist/OHScrcpy/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
     echo "[完成] 哈希文件已生成：${HASH_FILE}"
     echo ""
@@ -140,5 +140,8 @@ echo ""
 echo "============================================="
 echo "OpenHarmony OHScrcpy 安装程序制作完成！      "
 echo "============================================="
+echo "操作系统: ${OS_TYPE}"
+echo "输出目录: ${OUTPUT_DIR}"
+echo "生成文件: ${EXECUTABLE_NAME}"
 echo ""
 read -p "按任意键继续..."

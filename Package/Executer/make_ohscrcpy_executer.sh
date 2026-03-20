@@ -250,8 +250,8 @@ echo "生成的文件："
 ls -la "dist/"
 
 echo "[信息] 生成文件哈希值..."
-mkdir -p "output/${OS_TYPE}"
-cp "dist/${EXECUTABLE_NAME}" "output/${OS_TYPE}" 2>/dev/null
+mkdir -p "output/${OS_TYPE}/${ARCH}"
+cp "dist/${EXECUTABLE_NAME}" "output/${OS_TYPE}/${ARCH}" 2>/dev/null
 
 generate_hash() {
     local file="$1"
@@ -288,7 +288,7 @@ generate_hash() {
 }
 
 # 生成哈希文件
-HASH_FILE="output/${OS_TYPE}/OHScrcpy_hash.txt"
+HASH_FILE="output/${OS_TYPE}/${ARCH}/OHScrcpy_hash.txt"
 if generate_hash "dist/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
     echo "[完成] 哈希文件已生成：${HASH_FILE}"
     echo ""
@@ -306,7 +306,7 @@ echo -e "\033[32m=============================================\033[0m"
 echo -e "\033[32mOpenHarmony OHScrcpy 自动化打包完成！\033[0m"
 echo -e "\033[32m=============================================\033[0m"
 echo "操作系统: ${OS_TYPE}"
-echo "输出目录: output/${OS_TYPE}/"
+echo "输出目录: output/${OS_TYPE}/${ARCH}/"
 echo "生成文件: ${EXECUTABLE_NAME}"
 echo ""
 read -p "按任意键继续..."
