@@ -449,9 +449,6 @@ class ServerManager:
             print_log(LogLevel.ERROR, self.log_title, f"推送 ohscrcpy_server.cfg 失败: {result.get('stderr', '未知错误')}")
             return False
         
-        # 6. 准备设备环境
-        self.prepare_server()
-        
         print_log(LogLevel.INFO, self.log_title, f"安装完成")
         return True
 
@@ -477,6 +474,8 @@ class ServerManager:
     
     def start_server(self, port: int) -> bool:
         """启动服务端"""
+        # 准备设备环境
+        self.prepare_server()
         print_log(LogLevel.INFO, self.log_title, f"开始启动...")
         
         # 启动服务（异步执行）
