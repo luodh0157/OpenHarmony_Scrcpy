@@ -2,7 +2,7 @@
 ;   OpenHarmony OHScrcpy 安装程序配置（无代码签名版本）
 ; ======================================================
 
-#define OHScrcpy_AppVersion "1.7.0"
+#define OHScrcpy_AppVersion "1.8.0"
 
 ; --- 基本设置 ---
 [Setup]

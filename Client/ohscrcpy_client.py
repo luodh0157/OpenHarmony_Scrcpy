@@ -27,7 +27,7 @@ from tkinter import ttk, messagebox
 # ==================== 常量定义 ====================
 AUTHOR = "luodh0157"
 PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
-VERSION = "v1.7"
+VERSION = "v1.8"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
 HEARTBEAT_TIMEOUT = 5.0  # 心跳超时时间（秒）
@@ -187,6 +187,7 @@ class HDCCommandExecutor:
             
             try:
                 stdout, stderr = process.communicate(timeout=timeout)
+                print_log(LogLevel.DEBUG, self.log_title, f"执行结果: stdout: [{stdout.strip()}], stderr: [{stderr.strip()}]")
                 return {
                     "success": process.returncode == 0,
                     "stdout": stdout.strip(),
@@ -394,7 +395,11 @@ class ServerManager:
                 base_path = os.path.dirname(os.path.abspath(__file__))
             
             if manufacturer != "default":
-                base_path += os.sep + manufacturer + os.sep
+                manu_path = os.path.join(base_path, manufacturer)
+                file_path = os.path.join(manu_path, filename)
+                if os.path.exists(manu_path) and os.path.exists(file_path):
+                    base_path = os.path.join(base_path, manufacturer)
+            
             server_path = os.path.join(base_path, filename)
             print_log(LogLevel.DEBUG, self.log_title, f"待安装服务端可执行文件路径: {server_path}")
             return server_path
@@ -2291,16 +2296,19 @@ class OHScrcpyGUI:
             port = self.device_manager.get_port_forwarding()
             if port == -1:
                 print_log(LogLevel.ERROR, self.log_title, f"获取可用转发端口失败")
+                self.connect_btn.config(text="连接", bg="#2ecc71")
                 return
             
             # 安装并启动服务端
             if not self.install_and_start_server(port):
+                self.connect_btn.config(text="连接", bg="#2ecc71")
                 return
 
             # 设置端口转发
             print_log(LogLevel.INFO, self.log_title, f"设置端口转发...")
             if not self.device_manager.setup_port_forwarding(port, port):
                 print_log(LogLevel.ERROR, self.log_title, f"端口转发失败，请尝试重新连接...")
+                self.connect_btn.config(text="连接", bg="#2ecc71")
                 return
 
             try:
@@ -2345,7 +2353,7 @@ class OHScrcpyGUI:
                     self.root.bind('<F9>', lambda e: self._force_garbage_collection())
                 else:
                     self.update_device_status("连接失败")
-                    self.disconnect_device()
+                    self.connect_btn.config(text="连接", bg="#2ecc71")
                     messagebox.showinfo("连接失败",
                         "无法连接到服务端！请检查:\n"
                         "1. 服务端是否在设备上运行\n"
