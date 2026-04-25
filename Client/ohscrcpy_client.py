@@ -41,7 +41,7 @@ from tkinter import ttk, messagebox
 # ==================== 常量定义 ====================
 AUTHOR = "luodh0157"
 PROJECT_URL = "https://gitcode.com/luodh0157/OpenHarmony_Scrcpy"
-VERSION = "v1.8"
+VERSION = "v2.0"
 DEFAULT_PORT = 27183
 HOST = "127.0.0.1"
 HEARTBEAT_TIMEOUT = 5.0  # 心跳超时时间（秒）
@@ -56,6 +56,7 @@ class PacketType(IntEnum):
     PACKET_KEYFRAME = 3
     PACKET_FRAME = 4
     PACKET_CONFIG = 5
+    PACKET_VPS = 6
 
 # ==================== 日志函数定义 ====================
 class LogLevel(IntEnum):
@@ -770,56 +771,62 @@ class DeviceManager:
             return False
         return self.server_manager.check_server_running()
 
-# ==================== H.264解码器 ====================
-class H264Decoder:
-    """H.264解码器"""
+# ==================== 视频解码器（支持H.264和H.265） ====================
+class VideoDecoder:
+    """通用视频解码器（支持H.264和H.265）"""
     
     def __init__(self, config: VideoStreamConfig, debug: bool = False):
         self.config = config
+        self.codec_name = config.codec
         self.debug = debug
         self.log_title = "解码器"
         
-        # 解码器上下文
         self.codec_ctx = None
         
-        # SPS/PPS数据
         self.sps_data = None
         self.pps_data = None
+        self.vps_data = None
+        
         self.extradata = bytearray()
         
-        # 解码状态
+        self.vps_received = False
+        self.sps_received = False
+        self.pps_received = False
+        
         self.frame_count = 0
         self.decode_success = 0
         self.decode_failure = 0
         self.last_decode_time = 0
         
-        # 错误计数器
         self.consecutive_errors = 0
         self.max_consecutive_errors = 50
         
-        print_log(LogLevel.INFO, self.log_title, f"创建解码器实例: {config.width}x{config.height}")
+        print_log(LogLevel.INFO, self.log_title, f"创建解码器实例: {config.width}x{config.height}, codec: {config.codec}")
 
     def update_resolution(self, width: int, height: int):
         self.config.width = width
         self.config.height = height
 
-    def _init_codec(self):
+    def _get_codec_type(self) -> str:
+        """获取PyAV解码器类型字符串"""
+        if self.codec_name == "h265":
+            return 'hevc'
+        return 'h264'
+
+    def _init_codec(self) -> bool:
         """初始化解码器"""
         try:
-            # 释放现有解码器
             if self.codec_ctx is not None:
                 self.codec_ctx = None
             
-            # 创建解码器上下文
             import av
-            self.codec_ctx = av.CodecContext.create('h264', 'r')
+            codec_type = self._get_codec_type()
+            self.codec_ctx = av.CodecContext.create(codec_type, 'r')
             
-            # 设置解码器参数
             self.codec_ctx.width = self.config.width
             self.codec_ctx.height = self.config.height
             self.codec_ctx.pix_fmt = 'rgba'
             
-            # 如果有extradata，设置它
             if self.extradata:
                 try:
                     self.codec_ctx.extradata = self.extradata
@@ -827,7 +834,7 @@ class H264Decoder:
                 except Exception as e:
                     print_log(LogLevel.ERROR, self.log_title, f"设置extradata失败: {e}")
             
-            print_log(LogLevel.INFO, self.log_title, f"CodecContext初始化成功, {self.codec_ctx.width}x{self.codec_ctx.height}")
+            print_log(LogLevel.INFO, self.log_title, f"CodecContext初始化成功: {codec_type}, {self.codec_ctx.width}x{self.codec_ctx.height}")
             return True
             
         except Exception as e:
@@ -836,38 +843,73 @@ class H264Decoder:
             return False
 
     def is_ready(self) -> bool:
-        if not self.codec_ctx or not self.sps_data or not self.pps_data:
+        """检查解码器是否就绪"""
+        if not self.codec_ctx:
             return False
-        return True
+        if self.codec_name == "h265":
+            return self.vps_received and self.sps_received and self.pps_received
+        else:
+            return self.sps_received and self.pps_received
 
-    def set_sps_pps(self, sps_data: bytes, pps_data: bytes):
-        """设置SPS和PPS数据"""
-        if not sps_data or not pps_data:
+    def set_vps(self, vps_data: bytes) -> bool:
+        """设置VPS（H.265）"""
+        if not vps_data:
+            return False
+        self.vps_data = vps_data
+        self.vps_received = True
+        print_log(LogLevel.DEBUG, self.log_title, f"接收VPS: {len(vps_data)}字节")
+        return self._try_build_extradata()
+
+    def set_sps(self, sps_data: bytes) -> bool:
+        """设置SPS"""
+        if not sps_data:
+            return False
+        self.sps_data = sps_data
+        self.sps_received = True
+        print_log(LogLevel.DEBUG, self.log_title, f"接收SPS: {len(sps_data)}字节")
+        return self._try_build_extradata()
+
+    def set_pps(self, pps_data: bytes) -> bool:
+        """设置PPS"""
+        if not pps_data:
+            return False
+        self.pps_data = pps_data
+        self.pps_received = True
+        print_log(LogLevel.DEBUG, self.log_title, f"接收PPS: {len(pps_data)}字节")
+        return self._try_build_extradata()
+
+    def _try_build_extradata(self) -> bool:
+        """尝试构建extradata"""
+        if not self._all_params_received():
             return False
         
-        self.sps_data = sps_data
-        self.pps_data = pps_data
+        self.extradata = bytearray()
         
-        # 创建AnnexB格式的extradata
-        try:
-            # 构建AnnexB格式的extradata：起始码 + SPS + 起始码 + PPS
-            # 添加SPS
+        if self.codec_name == "h265":
+            if self.vps_data:
+                if not self._has_start_code(self.vps_data):
+                    self.extradata.extend(b'\x00\x00\x00\x01')
+                self.extradata.extend(self.vps_data)
+        
+        if self.sps_data:
             if not self._has_start_code(self.sps_data):
                 self.extradata.extend(b'\x00\x00\x00\x01')
             self.extradata.extend(self.sps_data)
-            
-            # 添加PPS
+        
+        if self.pps_data:
             if not self._has_start_code(self.pps_data):
                 self.extradata.extend(b'\x00\x00\x00\x01')
             self.extradata.extend(self.pps_data)
-            print_log(LogLevel.DEBUG, self.log_title, f"创建extradata: SPS={len(sps_data)}字节, PPS={len(pps_data)}字节")
-            
-            # 重新初始化解码器
-            return self._init_codec()
-                
-        except Exception as e:
-            print_log(LogLevel.ERROR, self.log_title, f"创建extradata失败: {e}")
-            return False
+        
+        print_log(LogLevel.INFO, self.log_title, f"构建extradata完成: {len(self.extradata)}字节")
+        return self._init_codec()
+
+    def _all_params_received(self) -> bool:
+        """检查是否已接收所有必要参数集"""
+        if self.codec_name == "h265":
+            return self.vps_received and self.sps_received and self.pps_received
+        else:
+            return self.sps_received and self.pps_received
 
     def _has_start_code(self, data: bytes) -> bool:
         """检查是否有起始码"""
@@ -881,7 +923,6 @@ class H264Decoder:
             print_log(LogLevel.WARN, self.log_title, f"空帧数据")
             return None
         
-        # 如果没有解码器上下文，尝试初始化
         if self.codec_ctx is None:
             if not self._init_codec():
                 return None
@@ -890,11 +931,9 @@ class H264Decoder:
         current_time = time.time()
         
         try:
-            # 确保数据有起始码
             if not self._has_start_code(frame_data):
                 frame_data = b'\x00\x00\x00\x01' + frame_data
             
-            # 如果是关键帧且还没有extradata，尝试重新初始化
             if is_keyframe and self.extradata and self.codec_ctx.extradata != self.extradata:
                 try:
                     self.codec_ctx.extradata = self.extradata
@@ -902,7 +941,6 @@ class H264Decoder:
                 except:
                     pass
             
-            # 解析数据包
             try:
                 import av
                 packets = self.codec_ctx.parse(frame_data)
@@ -913,7 +951,6 @@ class H264Decoder:
                 self.consecutive_errors += 1
                 return None
             
-            # 解码数据包
             decoded_frame = None
             for packet in packets:
                 if packet is not None:
@@ -922,7 +959,6 @@ class H264Decoder:
                         
                         for frame in frames:
                             if isinstance(frame, av.VideoFrame):
-                                # 使用正确的颜色空间转换
                                 rgb_array = frame.to_ndarray(format='rgb24')
                                 
                                 if rgb_array is not None:
@@ -940,7 +976,6 @@ class H264Decoder:
             else:
                 self.decode_failure += 1
                 
-                # 如果连续解码失败，重置解码器
                 if self.consecutive_errors >= self.max_consecutive_errors:
                     print_log(LogLevel.ERROR, self.log_title, f"连续解码失败 {self.consecutive_errors} 次，重置解码器")
                     self._init_codec()
@@ -959,6 +994,7 @@ class H264Decoder:
         self.codec_ctx = None
         self.sps_data = None
         self.pps_data = None
+        self.vps_data = None
         self.extradata = None
 
 # ==================== 视频流客户端 ====================
@@ -976,8 +1012,10 @@ class VideoStreamClient:
         self.decoder = None
         self.sps_received = False
         self.pps_received = False
+        self.vps_received = False
         self.sps_data = None
         self.pps_data = None
+        self.vps_data = None
         
         # 数据队列 - 使用线程安全队列
         self.frame_queue = queue.Queue(maxsize=50)
@@ -1040,14 +1078,16 @@ class VideoStreamClient:
                 self.last_heartbeat_time = time.time()
                 self.last_frame_time = time.time()
                 
-                # 创建解码器（但不立即初始化）
-                self.decoder = H264Decoder(self.config, debug=self.debug)
+                # 创建解码器（根据codec类型）
+                self.decoder = VideoDecoder(self.config, debug=self.debug)
                 
-                # 重置SPS/PPS状态
+                # 重置参数集状态
                 self.sps_received = False
                 self.pps_received = False
+                self.vps_received = False
                 self.sps_data = None
                 self.pps_data = None
+                self.vps_data = None
                 
                 # 启动工作线程
                 self._start_workers()
@@ -1247,7 +1287,8 @@ class VideoStreamClient:
 
                 # 2. 验证包头有效性
                 valid_types = [PacketType.PACKET_HEARTBEAT, PacketType.PACKET_SPS, PacketType.PACKET_PPS,
-                               PacketType.PACKET_KEYFRAME, PacketType.PACKET_FRAME, PacketType.PACKET_CONFIG]
+                               PacketType.PACKET_KEYFRAME, PacketType.PACKET_FRAME, PacketType.PACKET_CONFIG,
+                               PacketType.PACKET_VPS]
                 if packet_type not in valid_types:
                     # 严重错误，丢弃第一个字节，尝试重新寻找同步点
                     del self.recv_buffer[0:1]
@@ -1317,25 +1358,22 @@ class VideoStreamClient:
         """处理数据包"""
         self.last_data_time = time.time()
         
-        # 记录包类型用于调试
         packet_type_names = {
             PacketType.PACKET_HEARTBEAT: "HEARTBEAT",
             PacketType.PACKET_SPS: "SPS",
             PacketType.PACKET_PPS: "PPS",
             PacketType.PACKET_KEYFRAME: "KEYFRAME", 
             PacketType.PACKET_FRAME: "FRAME",
-            PacketType.PACKET_CONFIG: "CONFIG"
+            PacketType.PACKET_CONFIG: "CONFIG",
+            PacketType.PACKET_VPS: "VPS"
         }
         
         type_name = packet_type_names.get(packet_type, f"UNKNOWN({packet_type})")
-        # === 零长度数据包处理 ===
         if data_len == 0:
-            # 心跳包长度为0是正常的，其他类型则可能是错误
             if packet_type != PacketType.PACKET_HEARTBEAT:
                 print_log(LogLevel.WARN, self.log_title, f"警告: 收到零长度的 {type_name} 包，可能为协议错误，直接忽略！")
             return
         
-        # 详细日志输出
         if self.debug:
             need_print = True
         elif packet_type != PacketType.PACKET_HEARTBEAT and packet_type != PacketType.PACKET_FRAME:
@@ -1356,38 +1394,33 @@ class VideoStreamClient:
             self.config.height = config_msg[1]
             self.config.fps = config_msg[2]
             self.config.bitrate = config_msg[3]
-            self.decoder.update_resolution(config_msg[0], config_msg[1])
+            if self.decoder:
+                self.decoder.update_resolution(config_msg[0], config_msg[1])
             print_log(LogLevel.INFO, self.log_title, f"收到配置消息: {config_msg[0]}x{config_msg[1]}@{config_msg[2]}fps bitrate:{config_msg[3]}")
+            return
+        
+        elif packet_type == PacketType.PACKET_VPS:
+            self.vps_data = packet_data
+            self.vps_received = True
+            print_log(LogLevel.DEBUG, self.log_title, f"收到VPS: {len(packet_data)}字节")
+            if self.decoder:
+                self.decoder.set_vps(packet_data)
             return
         
         elif packet_type == PacketType.PACKET_SPS:
             self.sps_data = packet_data
             self.sps_received = True
-            
-            # 如果PPS也已经收到，初始化解码器
-            if self.pps_received and self.sps_data and self.pps_data:
-                print_log(LogLevel.INFO, self.log_title, f"SPS和PPS都已收到，初始化解码器")
-                if self.decoder and self.decoder.set_sps_pps(self.sps_data, self.pps_data):
-                    print_log(LogLevel.INFO, self.log_title, f"解码器初始化成功")
-                else:
-                    print_log(LogLevel.ERROR, self.log_title, f"解码器初始化失败")
-                self.sps_received = False
-                self.pps_received = False
+            print_log(LogLevel.DEBUG, self.log_title, f"收到SPS: {len(packet_data)}字节")
+            if self.decoder:
+                self.decoder.set_sps(packet_data)
             return
         
         elif packet_type == PacketType.PACKET_PPS:
             self.pps_data = packet_data
             self.pps_received = True
-            
-            # 如果SPS也已经收到，初始化解码器
-            if self.sps_received and self.sps_data and self.pps_data:
-                print_log(LogLevel.INFO, self.log_title, f"SPS和PPS都已收到，初始化解码器")
-                if self.decoder and self.decoder.set_sps_pps(self.sps_data, self.pps_data):
-                    print_log(LogLevel.INFO, self.log_title, f"解码器初始化成功")
-                else:
-                    print_log(LogLevel.ERROR, self.log_title, f"解码器初始化失败")
-                self.sps_received = False
-                self.pps_received = False
+            print_log(LogLevel.DEBUG, self.log_title, f"收到PPS: {len(packet_data)}字节")
+            if self.decoder:
+                self.decoder.set_pps(packet_data)
             return
         
         elif packet_type == PacketType.PACKET_KEYFRAME:
@@ -1400,7 +1433,6 @@ class VideoStreamClient:
             print_log(LogLevel.WARN, self.log_title, f"警告！收到未知数据包类型: {packet_type}")
             return
         
-        # 只有在解码器初始化成功后才尝试解码
         if self.decoder and self.decoder.is_ready():
             rgb_array = self.decoder.decode_frame(packet_data, is_keyframe)
             
@@ -1411,7 +1443,6 @@ class VideoStreamClient:
                 if self.debug and self.frame_count % 100 == 0:
                     print_log(LogLevel.DEBUG, self.log_title, f"成功解码第{self.frame_count}帧")
                 
-                # 放入队列
                 try:
                     self.frame_queue.put_nowait(rgb_array)
                     
@@ -1431,7 +1462,7 @@ class VideoStreamClient:
             else:
                 print_log(LogLevel.ERROR, self.log_title, f"解码失败，包类型={type_name}")
         else:
-            print_log(LogLevel.WARN, self.log_title, f"解码器未准备好，跳过帧 (SPS:{self.sps_received}, PPS:{self.pps_received})")
+            print_log(LogLevel.WARN, self.log_title, f"解码器未准备好，跳过帧 (VPS:{self.vps_received}, SPS:{self.sps_received}, PPS:{self.pps_received})")
     
     def _process_thread_func(self):
         """处理线程"""
@@ -1451,7 +1482,7 @@ class VideoStreamClient:
                                 f"解码失败={self.decoder.decode_failure}, "
                                 f"队列大小={self.frame_queue.qsize()}, ")
                         if self.debug:
-                            print_log(LogLevel.DEBUG, self.log_title, f"SPS状态: {self.sps_received}, PPS状态: {self.pps_received}")
+                            print_log(LogLevel.DEBUG, self.log_title, f"VPS状态: {self.vps_received}, SPS状态: {self.sps_received}, PPS状态: {self.pps_received}")
                 
                 # 短暂休眠，避免占用过多CPU
                 time.sleep(0.5)
@@ -2165,18 +2196,52 @@ class OHScrcpyGUI:
         """刷新设备"""
         self.update_device_status("正在扫描设备...")
         devices = self.device_manager.discover_devices()
+        display_names = [d.display_name() for d in devices]
+        current_selection = self.device_combo.get()
         
-        if devices:
-            display_names = [d.display_name() for d in devices]
-            self.device_combo['values'] = display_names
-            if display_names:
+        if not self.is_connected:
+            if devices:
+                self.device_combo['values'] = display_names
                 self.device_combo.set(display_names[0])
-            self.update_device_status(f"发现 {len(devices)} 个设备")
-            self.on_combobox_select(None)
-        else:
+                self.update_device_status(f"发现 {len(devices)} 个设备")
+                self.on_combobox_select(None)
+            else:
+                self.device_combo['values'] = []
+                self.device_combo.set('')
+                self.update_device_status("未发现设备")
+            return
+        
+        if not devices:
+            messagebox.showwarning("提示", "当前投屏设备已断开")
+            self.disconnect_device()
             self.device_combo['values'] = []
             self.device_combo.set('')
-            self.update_device_status("未发现设备")
+            self.update_device_status("设备已断开，未发现其他设备")
+            return
+        
+        if current_selection not in display_names:
+            messagebox.showwarning("提示", "当前投屏设备已断开")
+            self.disconnect_device()
+            current_list = list(self.device_combo['values'] or [])
+            if current_selection in current_list:
+                current_list.remove(current_selection)
+            self.device_combo['values'] = current_list
+            if current_list:
+                self.device_combo.set(current_list[0])
+            else:
+                self.device_combo.set('')
+            self.update_device_status(f"设备已断开，剩余 {len(current_list)} 个设备")
+            return
+        
+        current_list = list(self.device_combo['values'] or [])
+        new_devices = [name for name in display_names if name not in current_list]
+        
+        if new_devices:
+            self.device_combo['values'] = current_list + new_devices
+            self.update_device_status(f"发现 {len(new_devices)} 个新设备（投屏中）")
+            print_log(LogLevel.INFO, self.log_title, f"新增设备: {new_devices}")
+        else:
+            self.update_device_status(f"未发现新设备（投屏中，列表 {len(current_list)} 个）")
     
     def trigger_connection(self):
         """连接/断开设备"""
@@ -2462,6 +2527,7 @@ class OHScrcpyGUI:
             print_log(LogLevel.INFO, debug_info_title, f"坏包数: {self.video_client.bad_packet_bytes}")
             print_log(LogLevel.INFO, debug_info_title, f"SPS状态: {self.video_client.sps_received}")
             print_log(LogLevel.INFO, debug_info_title, f"PPS状态: {self.video_client.pps_received}")
+            print_log(LogLevel.INFO, debug_info_title, f"VPS状态: {self.video_client.vps_received}")
             
             if self.video_client.decoder:
                 decoder = self.video_client.decoder
@@ -2519,6 +2585,7 @@ class OHScrcpyGUI:
             debug_info.append(f"坏包数: {self.video_client.bad_packet_bytes}")
             debug_info.append(f"SPS状态: {self.video_client.sps_received}")
             debug_info.append(f"PPS状态: {self.video_client.pps_received}")
+            debug_info.append(f"VPS状态: {self.video_client.vps_received}")
             
             if self.video_client.decoder:
                 decoder = self.video_client.decoder

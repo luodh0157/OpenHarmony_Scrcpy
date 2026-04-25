@@ -23,7 +23,7 @@ echo     OpenHarmony OHScrcpy 安装程序制作脚本（Windows平台）
 echo ===========================================================
 echo.
 
-set VERSION="v1.8.0"
+set VERSION="v2.0.0"
 
 ::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
 if defined PROCESSOR_ARCHITEW6432 (

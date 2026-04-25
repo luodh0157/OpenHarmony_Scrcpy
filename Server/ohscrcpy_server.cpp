@@ -65,10 +65,11 @@
 #define PACKET_TYPE_KEYFRAME       0x00000003
 #define PACKET_TYPE_FRAME          0x00000004
 #define PACKET_TYPE_CONFIG         0x00000005
-#define PACKET_TYPE_CONFIG_DATA    0x00000006
+#define PACKET_TYPE_VPS            0x00000006
+#define PACKET_TYPE_CONFIG_DATA    0x00000007
 
 // 版本信息
-#define VERSION "v1.5"
+#define VERSION "v2.0"
 
 // H.264 NALU类型
 enum H264NaluType {
@@ -77,6 +78,16 @@ enum H264NaluType {
     NALU_TYPE_IDR = 5,
     NALU_TYPE_SEI = 6,
     NALU_TYPE_NON_IDR = 1
+};
+
+// H.265 NALU类型
+enum H265NaluType {
+    H265_NALU_TYPE_VPS = 32,
+    H265_NALU_TYPE_SPS = 33,
+    H265_NALU_TYPE_PPS = 34,
+    H265_NALU_TYPE_IDR_W = 19,
+    H265_NALU_TYPE_IDR_N = 20,
+    H265_NALU_TYPE_CRA = 21
 };
 
 using namespace OHOS;
@@ -494,6 +505,105 @@ public:
     }
 };
 
+// H.265工具函数
+class H265Utils {
+public:
+    // 从H.265数据中提取VPS、SPS、PPS（Annex-B格式）
+    static bool extractVpsSpsPpsAnnexB(const uint8_t* data, size_t size,
+                                       std::vector<uint8_t>& vps,
+                                       std::vector<uint8_t>& sps,
+                                       std::vector<uint8_t>& pps) {
+        vps.clear();
+        sps.clear();
+        pps.clear();
+        
+        if (size < 4) return false;
+        
+        size_t pos = 0;
+        bool found_vps = false, found_sps = false, found_pps = false;
+        
+        while (pos + 4 < size) {
+            size_t start_len = 0;
+            bool found_start = false;
+            
+            if (data[pos] == 0x00 && data[pos+1] == 0x00 && 
+                data[pos+2] == 0x00 && data[pos+3] == 0x01) {
+                found_start = true;
+                start_len = 4;
+            } else if (data[pos] == 0x00 && data[pos+1] == 0x00 && 
+                      data[pos+2] == 0x01) {
+                found_start = true;
+                start_len = 3;
+            }
+            
+            if (found_start) {
+                size_t nalu_start = pos + start_len;
+                if (nalu_start >= size) break;
+                
+                uint8_t nalu_type = (data[nalu_start] & 0x7E) >> 1;
+                
+                size_t next_start = nalu_start + 1;
+                while (next_start + 3 < size) {
+                    if (data[next_start] == 0x00 && data[next_start+1] == 0x00 &&
+                        (data[next_start+2] == 0x01 || 
+                         (data[next_start+2] == 0x00 && next_start+4 < size && 
+                          data[next_start+3] == 0x01))) {
+                        break;
+                    }
+                    next_start++;
+                }
+                
+                size_t nalu_end = (next_start + 3 < size) ? next_start : size;
+                std::vector<uint8_t> nalu(data + pos, data + nalu_end);
+                
+                if (nalu_type == H265_NALU_TYPE_VPS) {
+                    vps = std::move(nalu);
+                    found_vps = true;
+                    std::cout << "Found VPS: " << vps.size() << " bytes" << std::endl;
+                } else if (nalu_type == H265_NALU_TYPE_SPS) {
+                    sps = std::move(nalu);
+                    found_sps = true;
+                    std::cout << "Found SPS: " << sps.size() << " bytes" << std::endl;
+                } else if (nalu_type == H265_NALU_TYPE_PPS) {
+                    pps = std::move(nalu);
+                    found_pps = true;
+                    std::cout << "Found PPS: " << pps.size() << " bytes" << std::endl;
+                }
+                
+                pos = nalu_end;
+                
+                if (found_vps && found_sps && found_pps) {
+                    return true;
+                }
+            } else {
+                pos++;
+            }
+        }
+        
+        return found_vps && found_sps && found_pps;
+    }
+    
+    static bool isKeyFrame(const uint8_t* data, size_t size) {
+        if (size < 5) return false;
+        
+        size_t offset = 0;
+        if (data[0] == 0x00 && data[1] == 0x00) {
+            if (data[2] == 0x00 && data[3] == 0x01) {
+                offset = 4;
+            } else if (data[2] == 0x01) {
+                offset = 3;
+            }
+        }
+        
+        if (offset >= size) return false;
+        
+        uint8_t nalu_type = (data[offset] & 0x7E) >> 1;
+        return nalu_type == H265_NALU_TYPE_IDR_W || 
+               nalu_type == H265_NALU_TYPE_IDR_N || 
+               nalu_type == H265_NALU_TYPE_CRA;
+    }
+};
+
 // 视频编码器回调上下文
 struct EncoderContext {
     NetworkStreamer* streamer;
@@ -501,7 +611,9 @@ struct EncoderContext {
     std::atomic<uint64_t> frame_count{0};
     std::vector<uint8_t> sps_data;
     std::vector<uint8_t> pps_data;
-    std::atomic<bool> sps_pps_sent{false};
+    std::vector<uint8_t> vps_data;
+    std::atomic<bool> params_sent{false};
+    bool is_hevc = false;
 };
 
 // 视频编码类
@@ -633,6 +745,66 @@ public:
         std::cout << "------------------------------------------------------" << std::endl;
     }
     
+    void printHevcVideoCodecCapability() {
+        std::cout << "------------------------------------------------------" << std::endl;
+        std::cout << "HEVC(H.265) Video Codec Capability Info: " << std::endl;
+        OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(OH_AVCODEC_MIMETYPE_VIDEO_HEVC, true, HARDWARE);
+        if (capability == nullptr) {
+            std::cout << "  H265 encoder NOT supported" << std::endl;
+            std::cout << "------------------------------------------------------" << std::endl;
+            return;
+        }
+        const char *codecName = OH_AVCapability_GetName(capability);
+        std::cout << "  CodecName: " << codecName << std::endl;
+
+        bool isSupported = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_CBR);
+        bool isSupported2 = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_VBR);
+        bool isSupported3 = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_CQ);
+        std::cout << "  BitRateModeSupported: CBR[" << isSupported << "], VBR[" << isSupported2 << "], CQ[" 
+                  << isSupported3 << "]" << std::endl;
+
+        OH_AVRange bitrateRange = {-1, -1};
+        int32_t ret = OH_AVCapability_GetEncoderBitrateRange(capability, &bitrateRange);
+        if (ret == AV_ERR_OK) {
+            std::cout << "  BitRateRange: [" << bitrateRange.minVal << "~" << bitrateRange.maxVal << "]" << std::endl;
+        }
+
+        OH_AVRange widthRange = {-1, -1}, heightRange = {-1, -1};
+        ret = OH_AVCapability_GetVideoWidthRange(capability, &widthRange);
+        if (ret == AV_ERR_OK) {
+            std::cout << "  WidthRange: [" << widthRange.minVal << "~" << widthRange.maxVal << "]" << std::endl;
+        }
+        ret = OH_AVCapability_GetVideoHeightRange(capability, &heightRange);
+        if (ret == AV_ERR_OK) {
+            std::cout << "  HeightRange: [" << heightRange.minVal << "~" << heightRange.maxVal << "]" << std::endl;
+        }
+
+        int32_t widthAlignment = 0, heightAlignment = 0;
+        OH_AVCapability_GetVideoWidthAlignment(capability, &widthAlignment);
+        OH_AVCapability_GetVideoHeightAlignment(capability, &heightAlignment);
+        std::cout << "  Alignment: " << widthAlignment << "x" << heightAlignment << std::endl;
+
+        OH_AVRange frameRateRange = {-1, -1};
+        ret = OH_AVCapability_GetVideoFrameRateRange(capability, &frameRateRange);
+        if (ret == AV_ERR_OK) {
+            std::cout << "  FrameRateRange: [" << frameRateRange.minVal << "~" << frameRateRange.maxVal << "]" << std::endl;
+        }
+
+        const int32_t *profiles = nullptr;
+        uint32_t profileNum = 0;
+        OH_AVCapability_GetSupportedProfiles(capability, &profiles, &profileNum);
+        if (profiles != nullptr && profileNum > 0) {
+            std::cout << "  SupportedProfiles: [";
+            for (uint32_t i = 0; i < profileNum; i++) {
+                std::cout << profiles[i];
+                if (i < profileNum - 1) std::cout << ",";
+            }
+            std::cout << "]" << std::endl;
+        }
+
+        std::cout << "------------------------------------------------------" << std::endl;
+    }
+    
     bool initialize(const ScreenInfo& info, NetworkStreamer* streamer) {
         if (encoder_ != nullptr) {
             std::cout << "VideoEncoder has been initialized" << std::endl;
@@ -640,12 +812,22 @@ public:
         }
         std::cout << "Initializing VideoEncoder..." << std::endl;
 
-        printAvcVideoCodecCapability();
+        bool is_hevc = (info.codec == "h265");
         
-        // 创建H.264编码器实例
-        encoder_ = OH_VideoEncoder_CreateByMime(OH_AVCODEC_MIMETYPE_VIDEO_AVC);
+        if (is_hevc) {
+            printHevcVideoCodecCapability();
+        } else {
+            printAvcVideoCodecCapability();
+        }
+        
+        // 根据codec类型创建编码器
+        if (is_hevc) {
+            encoder_ = OH_VideoEncoder_CreateByMime(OH_AVCODEC_MIMETYPE_VIDEO_HEVC);
+        } else {
+            encoder_ = OH_VideoEncoder_CreateByMime(OH_AVCODEC_MIMETYPE_VIDEO_AVC);
+        }
         if (encoder_ == nullptr) {
-            std::cerr << "OH_VideoEncoder_CreateByMime fail" << std::endl;
+            std::cerr << "OH_VideoEncoder_CreateByMime fail for codec: " << info.codec << std::endl;
             return false;
         }
 
@@ -675,7 +857,13 @@ public:
         OH_AVFormat_SetLongValue(format, OH_MD_KEY_BITRATE, info.bitrate); // 必须配置，设置码率，单位为bps。
         OH_AVFormat_SetIntValue(format, OH_MD_KEY_PIXEL_FORMAT, AV_PIXEL_FORMAT_RGBA);
         OH_AVFormat_SetIntValue(format, OH_MD_KEY_VIDEO_ENCODE_BITRATE_MODE, OH_BitrateMode::BITRATE_MODE_VBR);
-		OH_AVFormat_SetIntValue(format, OH_MD_KEY_PROFILE, OH_AVCProfile::AVC_PROFILE_MAIN);
+        
+        // 根据codec类型设置Profile
+        if (is_hevc) {
+            OH_AVFormat_SetIntValue(format, OH_MD_KEY_PROFILE, OH_HEVCProfile::HEVC_PROFILE_MAIN);
+        } else {
+            OH_AVFormat_SetIntValue(format, OH_MD_KEY_PROFILE, OH_AVCProfile::AVC_PROFILE_MAIN);
+        }
         OH_AVFormat_SetIntValue(format, OH_MD_KEY_I_FRAME_INTERVAL, 500); // 关键帧间隔，单位毫秒
         
         // 配置编码器
@@ -703,8 +891,9 @@ public:
 
         context_->streamer = streamer;
         context_->screen_info = info;
-        context_->sps_pps_sent = false;
-        std::cout << "VideoEncoder initialized successfully" << std::endl;
+        context_->params_sent = false;
+        context_->is_hevc = is_hevc;
+        std::cout << "VideoEncoder initialized successfully for codec: " << info.codec << std::endl;
         return true;
     }
     
@@ -742,23 +931,25 @@ public:
         }
     }
     
-    bool sendSpsPps() {
+    bool sendCodecParams() {
+        if (!context_->streamer->hasClient()) {
+            return false;
+        }
+        
+        // H.265需要发送VPS
+        if (context_->is_hevc && !context_->vps_data.empty()) {
+            std::cout << "Sending VPS (" << context_->vps_data.size() << " bytes)" << std::endl;
+            if (!context_->streamer->sendPacket(context_->vps_data.data(),
+                                               context_->vps_data.size(),
+                                               PACKET_TYPE_VPS)) {
+                std::cerr << "Failed to send VPS" << std::endl;
+                return false;
+            }
+        }
+        
         if (!context_->sps_data.empty() && !context_->pps_data.empty()) {
             std::cout << "Sending SPS (" << context_->sps_data.size() << " bytes) and PPS (" 
                     << context_->pps_data.size() << " bytes)" << std::endl;
-            
-            // 打印SPS/PPS详细信息
-            std::cout << "SPS: ";
-            for (size_t i = 0; i < context_->sps_data.size(); i++) {
-                printf("%02x ", context_->sps_data[i]);
-            }
-            std::cout << std::endl;
-            
-            std::cout << "PPS: ";
-            for (size_t i = 0; i < context_->pps_data.size(); i++) {
-                printf("%02x ", context_->pps_data[i]);
-            }
-            std::cout << std::endl;
             
             // 发送视频配置信息
             if (!context_->streamer->sendVideoConfig(context_->screen_info)) {
@@ -781,7 +972,7 @@ public:
                 std::cerr << "Failed to send PPS" << std::endl;
                 return false;
             }
-            context_->sps_pps_sent = true;
+            context_->params_sent = true;
             return true;
         }
         
@@ -791,7 +982,7 @@ public:
 
     bool isEncoding() const { return is_encoding_; }
     uint64_t getFrameCount() const { return context_->frame_count; }
-    bool isSpsPpsSent() const { return context_->sps_pps_sent.load(); }
+    bool isParamsSent() const { return context_->params_sent.load(); }
     
     OH_AVCodec* getEncoder() const { return encoder_; }
     OHNativeWindow* getSurface() const { return surface_; }
@@ -882,22 +1073,32 @@ public:
     static void handleCofingFrame(VideoEncoder* self, uint8_t *addr, size_t size) {
         std::cout << "Received codec config data: " << size << " bytes" << std::endl;
         
-        // 尝试提取SPS和PPS
-        std::vector<uint8_t> sps, pps;
-        if (H264Utils::extractSpsPpsAnnexB(addr, size, sps, pps)) {
-            self->context_->sps_data = std::move(sps);
-            self->context_->pps_data = std::move(pps);
-            
-            // 立即发送SPS/PPS
-            if (self->context_->streamer->hasClient()) {
-                self->sendSpsPps();
+        if (self->context_->is_hevc) {
+            // H.265: 提取VPS、SPS、PPS
+            std::vector<uint8_t> vps, sps, pps;
+            if (H265Utils::extractVpsSpsPpsAnnexB(addr, size, vps, sps, pps)) {
+                self->context_->vps_data = std::move(vps);
+                self->context_->sps_data = std::move(sps);
+                self->context_->pps_data = std::move(pps);
+                
+                if (self->context_->streamer->hasClient()) {
+                    self->sendCodecParams();
+                }
+            } else {
+                std::cout << "Could not extract VPS/SPS/PPS from config data" << std::endl;
             }
         } else {
-            std::cout << "Could not extract SPS/PPS from config data, sending raw config" << std::endl;
-            
-            // 如果无法提取，直接发送配置数据
-            if (self->context_->streamer->hasClient()) {
-                self->context_->streamer->sendPacket((const void*)addr, size, PACKET_TYPE_SPS);
+            // H.264: 提取SPS、PPS
+            std::vector<uint8_t> sps, pps;
+            if (H264Utils::extractSpsPpsAnnexB(addr, size, sps, pps)) {
+                self->context_->sps_data = std::move(sps);
+                self->context_->pps_data = std::move(pps);
+                
+                if (self->context_->streamer->hasClient()) {
+                    self->sendCodecParams();
+                }
+            } else {
+                std::cout << "Could not extract SPS/PPS from config data" << std::endl;
             }
         }
     }
@@ -910,15 +1111,27 @@ public:
             std::cout << "Recv INCOMPLETE_FRAME" << std::endl;
         }
         
-        // 如果SPS/PPS尚未发送，尝试从帧数据中提取
-        if (is_keyframe && !self->context_->sps_pps_sent.load()) {
-            std::vector<uint8_t> sps, pps;
-            if (H264Utils::extractSpsPpsAnnexB(addr, size, sps, pps)) {
-                self->context_->sps_data = std::move(sps);
-                self->context_->pps_data = std::move(pps);
-                self->sendSpsPps();
+        // 如果参数集尚未发送，尝试从关键帧数据中提取
+        if (is_keyframe && !self->context_->params_sent.load()) {
+            if (self->context_->is_hevc) {
+                std::vector<uint8_t> vps, sps, pps;
+                if (H265Utils::extractVpsSpsPpsAnnexB(addr, size, vps, sps, pps)) {
+                    self->context_->vps_data = std::move(vps);
+                    self->context_->sps_data = std::move(sps);
+                    self->context_->pps_data = std::move(pps);
+                    self->sendCodecParams();
+                } else {
+                    std::cerr << "Failed to extract VPS/SPS/PPS from H.265 keyframe" << std::endl;
+                }
             } else {
-                std::cerr << "Failed to extract SPS/PPS from keyframe" << std::endl;
+                std::vector<uint8_t> sps, pps;
+                if (H264Utils::extractSpsPpsAnnexB(addr, size, sps, pps)) {
+                    self->context_->sps_data = std::move(sps);
+                    self->context_->pps_data = std::move(pps);
+                    self->sendCodecParams();
+                } else {
+                    std::cerr << "Failed to extract SPS/PPS from keyframe" << std::endl;
+                }
             }
         }
         
@@ -970,9 +1183,16 @@ public:
             .videoSource = OH_VIDEO_SOURCE_SURFACE_RGBA
         };
         
-        // 配置视频编码信息
+        // 配置视频编码信息 - 根据codec类型选择编码格式
+        OH_VideoCodecFormat videoCodec;
+        if (info.codec == "h265") {
+            videoCodec = OH_VideoCodecFormat::OH_H265;
+        } else {
+            videoCodec = OH_VideoCodecFormat::OH_H264;
+        }
+        
         OH_VideoEncInfo videoEncInfo = {
-            .videoCodec = OH_VideoCodecFormat::OH_H264,
+            .videoCodec = videoCodec,
             .videoBitrate = info.bitrate,
             .videoFrameRate = info.fps
         };
@@ -1204,6 +1424,220 @@ public:
         initStreaming();
     }
     
+    // 标准分辨率结构体
+    struct StandardResolution {
+        int32_t width;
+        int32_t height;
+        std::string name;
+        int64_t defaultBitrate;
+    };
+    
+    // 横屏标准分辨率列表
+    const std::vector<StandardResolution> HORIZONTAL_RESOLUTIONS = {
+        {3840, 2160, "4K",      8000000},
+        {2560, 1440, "2K",      6000000},
+        {1920, 1080, "1080p",   4000000},
+        {1280, 720,  "720p",    2000000},
+        {854,  480,  "480p",    1000000},
+        {640,  360,  "360p",    600000},
+        {426,  240,  "240p",    300000},
+    };
+    
+    // 竖屏标准分辨率列表
+    const std::vector<StandardResolution> VERTICAL_RESOLUTIONS = {
+        {2160, 3840, "4K",      8000000},
+        {1440, 2560, "2K",      6000000},
+        {1080, 1920, "1080p",   4000000},
+        {720,  1280, "720p",    2000000},
+        {480,  854,  "480p",    1000000},
+        {360,  640,  "360p",    600000},
+        {240,  426,  "240p",    300000},
+    };
+    
+    // H.265编码器存在性检测（不检测具体分辨率）
+    bool checkHevcEncoderExists() {
+        std::cout << "[Step 1] Check H.265 hardware encoder existence" << std::endl;
+        OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(
+            OH_AVCODEC_MIMETYPE_VIDEO_HEVC, true, HARDWARE);
+        
+        if (capability == nullptr) {
+            std::cout << "  H.265 hardware encoder NOT supported" << std::endl;
+            return false;
+        }
+        
+        std::cout << "  H.265 hardware encoder supported" << std::endl;
+        return true;
+    }
+    
+    // H.265特定分辨率+帧率检测
+    bool checkHevcSizeAndFrameRateSupported(int32_t width, int32_t height, int32_t fps) {
+        OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(
+            OH_AVCODEC_MIMETYPE_VIDEO_HEVC, true, HARDWARE);
+        
+        if (capability == nullptr) return false;
+        
+        bool supported = OH_AVCapability_AreVideoSizeAndFrameRateSupported(capability, width, height, fps);
+        
+        if (supported) {
+            std::cout << "  H.265 supports " << width << "x" << height << "@" << fps << "fps" << std::endl;
+        } else {
+            std::cout << "  H.265 does NOT support " << width << "x" << height << "@" << fps << "fps" << std::endl;
+        }
+        
+        return supported;
+    }
+    
+    // H.264特定分辨率+帧率检测
+    bool checkAvcSizeAndFrameRateSupported(int32_t width, int32_t height, int32_t fps) {
+        OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(
+            OH_AVCODEC_MIMETYPE_VIDEO_AVC, true, HARDWARE);
+        
+        if (capability == nullptr) return false;
+        
+        bool supported = OH_AVCapability_AreVideoSizeAndFrameRateSupported(capability, width, height, fps);
+        
+        if (supported) {
+            std::cout << "  H.264 supports " << width << "x" << height << "@" << fps << "fps" << std::endl;
+        } else {
+            std::cout << "  H.264 does NOT support " << width << "x" << height << "@" << fps << "fps" << std::endl;
+        }
+        
+        return supported;
+    }
+    
+    // 判断屏幕方向
+    bool isHorizontalScreen(int32_t width, int32_t height) {
+        return width >= height;
+    }
+    
+    // 计算分辨率接近度
+    int64_t calculateResolutionDistance(int32_t w1, int32_t h1, int32_t w2, int32_t h2) {
+        int64_t pixels1 = (int64_t)w1 * h1;
+        int64_t pixels2 = (int64_t)w2 * h2;
+        return std::abs(pixels1 - pixels2);
+    }
+    
+    // 从指定codec的标准列表找支持的分辨率
+    StandardResolution findCodecSupportedResolution(const std::string& codec,
+                                                    int32_t origWidth, int32_t origHeight, int32_t fps) {
+        bool isHorizontal = isHorizontalScreen(origWidth, origHeight);
+        const std::vector<StandardResolution>& resolutions = 
+            isHorizontal ? HORIZONTAL_RESOLUTIONS : VERTICAL_RESOLUTIONS;
+        
+        std::cout << "  Searching " << codec << " supported resolutions (direction: " 
+                  << (isHorizontal ? "horizontal" : "vertical") << ")..." << std::endl;
+        
+        std::vector<StandardResolution> candidates;
+        for (const auto& res : resolutions) {
+            bool supported;
+            if (codec == "h265") {
+                supported = checkHevcSizeAndFrameRateSupported(res.width, res.height, fps);
+            } else {
+                supported = checkAvcSizeAndFrameRateSupported(res.width, res.height, fps);
+            }
+            
+            if (supported) {
+                candidates.push_back(res);
+                std::cout << "    " << res.name << " (" << res.width << "x" << res.height << ") - PASSED" << std::endl;
+            } else {
+                std::cout << "    " << res.name << " (" << res.width << "x" << res.height << ") - NOT supported" << std::endl;
+            }
+        }
+        
+        if (candidates.empty()) {
+            std::cout << "  No " << codec << " supported resolution found!" << std::endl;
+            return {0, 0, "none", 0};  // 表示未找到
+        }
+        
+        // 找像素数最接近原始的
+        StandardResolution best = candidates[0];
+        int64_t minDistance = calculateResolutionDistance(origWidth, origHeight, best.width, best.height);
+        for (const auto& cand : candidates) {
+            int64_t dist = calculateResolutionDistance(origWidth, origHeight, cand.width, cand.height);
+            if (dist < minDistance) {
+                minDistance = dist;
+                best = cand;
+            }
+        }
+        
+        std::cout << "  Best " << codec << " match: " << best.name 
+                  << " (" << best.width << "x" << best.height << ")" << std::endl;
+        
+        return best;
+    }
+    
+    // 按比例调整比特率
+    int64_t adjustBitrateByResolution(int64_t originalBitrate,
+                                      int32_t origW, int32_t origH,
+                                      int32_t newW, int32_t newH) {
+        int64_t origPixels = (int64_t)origW * origH;
+        int64_t newPixels = (int64_t)newW * newH;
+        
+        if (origPixels <= 0) return originalBitrate;
+        
+        double ratio = (double)newPixels / origPixels;
+        int64_t newBitrate = (int64_t)(originalBitrate * ratio);
+        
+        if (newBitrate < 500000) newBitrate = 500000;
+        if (newBitrate > originalBitrate * 2) newBitrate = originalBitrate * 2;
+        
+        return newBitrate;
+    }
+    
+void applyCodecConfig(ScreenInfo& screenInfo, const StandardResolution& res, 
+                          int64_t origBitrate, int32_t origWidth, int32_t origHeight,
+                          const std::string& codec) {
+        screenInfo.width = res.width;
+        screenInfo.height = res.height;
+        screenInfo.codec = codec;
+        screenInfo.bitrate = adjustBitrateByResolution(origBitrate, origWidth, origHeight,
+                                                       screenInfo.width, screenInfo.height);
+    }
+    
+    void applyDefaultConfig(ScreenInfo& screenInfo) {
+        screenInfo.width = 720;
+        screenInfo.height = 1280;
+        screenInfo.codec = "h264";
+        screenInfo.bitrate = 2000000;
+    }
+    
+    bool selectCodecAndResolution(ScreenInfo& screenInfo, int32_t origWidth, int32_t origHeight,
+                                      int32_t origFps, int64_t origBitrate) {
+        bool hasHevc = checkHevcEncoderExists();
+        
+        if (hasHevc) {
+            std::cout << "[Step 2] Check if H.265 supports original resolution" << std::endl;
+            if (checkHevcSizeAndFrameRateSupported(origWidth, origHeight, origFps)) {
+                std::cout << "  H.265 supports original resolution, using H.265 directly" << std::endl;
+                screenInfo.codec = "h265";
+                return true;
+            }
+            
+            std::cout << "[Step 3] Find H.265 supported resolution from standard list" << std::endl;
+            StandardResolution hevcRes = findCodecSupportedResolution("h265", origWidth, origHeight, origFps);
+            if (hevcRes.name != "none") {
+                std::cout << "  Found H.265 supported resolution, using H.265" << std::endl;
+                applyCodecConfig(screenInfo, hevcRes, origBitrate, origWidth, origHeight, "h265");
+                return true;
+            }
+            
+            std::cout << "[Step 4] No H.265 resolution found, fallback to H.264" << std::endl;
+        } else {
+            std::cout << "[Step 2] No H.265 encoder, using H.264" << std::endl;
+        }
+        
+        StandardResolution avcRes = findCodecSupportedResolution("h264", origWidth, origHeight, origFps);
+        if (avcRes.name != "none") {
+            std::cout << "  Found H.264 supported resolution, using H.264" << std::endl;
+            applyCodecConfig(screenInfo, avcRes, origBitrate, origWidth, origHeight, "h264");
+            return true;
+        }
+        
+        std::cout << "  No codec supports any standard resolution! Forcing default 720x1280 H.264" << std::endl;
+        applyDefaultConfig(screenInfo);
+        return true;
+    }
+    
 private:
     bool initialize(const CommandLineArgs& args) {
         std::cout << "Initializing modules..." << std::endl;
@@ -1213,15 +1647,24 @@ private:
             return false;
         }
 
-        // 2. 设置屏幕显示信息
-        screen_info_.width = args.width;
-        screen_info_.height = args.height;
-        screen_info_.fps = args.framerate;
-        screen_info_.bitrate = args.bitrate;
+        // 2. 获取屏幕信息（原始分辨率）
+        ScreenInfo screenInfo;
+        if (!getPrimaryScreenInfo(screenInfo)) {
+            std::cerr << "Get primary screen info fail" << std::endl;
+            return false;
+        }
+        
+		// 3. 自动选择最优codec
+        selectCodecAndResolution(screenInfo, screenInfo.width, screenInfo.height,
+                                 screenInfo.fps, screenInfo.bitrate);
 
-        std::cout << "Configuration info: " << screen_info_.width << "x" << screen_info_.height 
-                  << "@" << screen_info_.fps << "fps" << " bitrate:" << screen_info_.bitrate 
-                  << " " << screen_info_.codec << std::endl;
+        // 4. 设置最终配置
+        screen_info_ = screenInfo;
+        std::cout << "------------------------------------------------------" << std::endl;
+        std::cout << "Final config: " << screen_info_.width << "x" << screen_info_.height 
+                  << "@" << screen_info_.fps << "fps, codec=" << screen_info_.codec 
+                  << ", bitrate=" << screen_info_.bitrate << "bps" << std::endl;
+		std::cout << "------------------------------------------------------" << std::endl;
         return true;
     }
 
