@@ -29,7 +29,7 @@
    1. **HDCCommandExecutor**：HDC命令执行器
    2. **ServerManager**：服务端管理器
    3. **DeviceManager**：设备管理器
-   4. **H264Decoder**：H.264视频解码器
+   4. **VideoDecoder**：H.265/H.264视频解码器
    5. **VideoStreamClient**：视频流客户端
    6. **DeviceController**：设备控制器
    7. **OHScrcpyGUI**：图形用户界面
@@ -96,7 +96,7 @@ python ohscrcpy_client.py
 - **分辨率**：设备原始分辨率
 - **帧率**：30 fps
 - **码率**：1.5 Mbps
-- **编码格式**：H.264
+- **编码格式**：H.265/H.264
 
 ### 网络配置
 - **默认端口**：27183
