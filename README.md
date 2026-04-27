@@ -6,7 +6,7 @@
 - **计算机侧（客户端）**：基于Python跨平台实现
 - **OpenHarmony设备侧（服务端）**：基于OpenHarmony系统C-API实现
 
-![系统架构图.png](https://raw.gitcode.com/user-images/assets/8887101/4ecaf450-6b76-44f0-a0cb-f0a3f1debcf5/系统架构图.png '系统架构图.png')'系统架构图.png')
+![系统架构图.png](./系统架构图.png '系统架构图.png')
 
 ## 特性
 
@@ -132,8 +132,8 @@ OpenHarmony_Scrcpy/
    3. 从`设备列表`中选择要连接的设备
    4. 点击`连接`按钮开始投屏
 
-![客户端启动GUI.png](https://raw.gitcode.com/user-images/assets/8887101/be893f96-9c62-471a-a755-3166749a9ef1/客户端启动GUI.png '客户端启动GUI.png')
-![客户端投屏GUI.png](https://raw.gitcode.com/user-images/assets/8887101/d23e0506-4ac2-4ae7-a2cd-3abd6bf5b103/客户端投屏GUI.png '客户端投屏GUI.png')
+![客户端启动GUI.png](./Client/客户端启动GUI.png '客户端启动GUI.png')
+![客户端投屏GUI.png](./Client/客户端投屏GUI.png '客户端投屏GUI.png')
 
 ### 4. 基本操作
 

@@ -62,8 +62,8 @@ python ohscrcpy_client.py
    3. 从`设备列表`中选择要连接的设备
    4. 点击`连接`按钮开始投屏
 
-![客户端启动GUI.png](https://raw.gitcode.com/user-images/assets/8887101/5722c5bc-07ab-47b8-9f71-ad8bbc1a773a/客户端启动GUI.png '客户端启动GUI.png')
-![客户端投屏GUI.png](https://raw.gitcode.com/user-images/assets/8887101/d9e6e856-6317-4557-9578-6c4c14a01bdb/客户端投屏GUI.png '客户端投屏GUI.png')
+![客户端启动GUI.png](./客户端启动GUI.png '客户端启动GUI.png')
+![客户端投屏GUI.png](./客户端投屏GUI.png '客户端投屏GUI.png')
 
 ### 3. 基本操作
 
