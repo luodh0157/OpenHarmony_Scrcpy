@@ -1,5 +1,5 @@
 REM Copyright (c) 2026 luodh0157.
-REM Licensed under the Apache License, Version 2.0 (the "License");
+REM Licensed under the Apache License, Version 2.0 (the "License").
 REM you may not use this file except in compliance with the License.
 REM You may obtain a copy of the License at
 REM
@@ -18,9 +18,11 @@ REM limitations under the License.
 
 title OpenHarmony OHScrcpy 打包构建脚本
 color 0a
-echo ===========================================================
-echo      OpenHarmony OHScrcpy 自动化构建脚本（Windows平台）    
-echo ===========================================================
+echo ============================================================
+echo      OpenHarmony OHScrcpy 自动化构建脚本（Windows平台）     
+echo ============================================================
+
+set VERSION=v2.1.0
 
 ::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
 if defined PROCESSOR_ARCHITEW6432 (
@@ -79,9 +81,41 @@ if exist __pycache__ rmdir /s /q __pycache__
 echo [完成] 清理完成
 
 echo [信息] 检查必要文件...
-if not exist ohscrcpy_client.py (
+if not exist main.py (
     echo ---------------------------------------------------
-    echo [错误] 未找到 ohscrcpy_client.py，请确保该文件存在
+    echo [错误] 未找到 main.py，请确保该文件存在
+    echo ---------------------------------------------------
+    pause
+    exit /b 1
+)
+
+if not exist core (
+    echo ---------------------------------------------------
+    echo [错误] 未找到模块目录 core
+    echo ---------------------------------------------------
+    pause
+    exit /b 1
+)
+
+if not exist video (
+    echo ---------------------------------------------------
+    echo [错误] 未找到模块目录 video
+    echo ---------------------------------------------------
+    pause
+    exit /b 1
+)
+
+if not exist gui (
+    echo ---------------------------------------------------
+    echo [错误] 未找到模块目录 gui
+    echo ---------------------------------------------------
+    pause
+    exit /b 1
+)
+
+if not exist utils (
+    echo ---------------------------------------------------
+    echo [错误] 未找到模块目录 utils
     echo ---------------------------------------------------
     pause
     exit /b 1
@@ -153,7 +187,7 @@ echo *****************************
 echo ******************************
 echo [信息] 开始PyInstaller打包...
 echo ******************************
-pyinstaller .\ohscrcpy_client.py --name "OHScrcpy" --noconfirm --clean --windowed --console --onefile --add-data "ohscrcpy_server:." --add-data "ohscrcpy_server.cfg:." --add-data "HUAWEI\ohscrcpy_server:HUAWEI" --add-data "hdc\Windows\%ARCH%\hdc.exe:." --add-data "hdc\Windows\%ARCH%\libusb_shared.dll:." --icon app.ico
+pyinstaller .\main.py --name "OHScrcpy" --noconfirm --clean --windowed --console --onefile --hidden-import core --hidden-import core.constants --hidden-import core.exceptions --hidden-import core.logger --hidden-import core.hdc_executor --hidden-import core.server_manager --hidden-import core.device_manager --hidden-import video --hidden-import video.config --hidden-import video.decoder --hidden-import video.stream_client --hidden-import gui --hidden-import gui.device_controller --hidden-import utils --hidden-import utils.platform_utils --add-data "ohscrcpy_server:." --add-data "ohscrcpy_server.cfg:." --add-data "HUAWEI\ohscrcpy_server:HUAWEI" --add-data "hdc\Windows\%ARCH%\hdc.exe:." --add-data "hdc\Windows\%ARCH%\libusb_shared.dll:." --icon app.ico
 if %errorlevel% neq 0 (
     echo ---------------------------
     echo [错误] PyInstaller打包失败
@@ -181,29 +215,29 @@ echo 生成的文件：
 dir dist\* /b
 
 echo [信息] 生成文件哈希值...
-if not exist output\Windows mkdir output\Windows
-copy dist\OHScrcpy.exe output\Windows  >nul
+if not exist output\Windows\%ARCH% mkdir output\Windows\%ARCH%
+copy dist\OHScrcpy.exe output\Windows\%ARCH%  >nul
 where certutil >nul 2>nul
 if %errorlevel% equ 0 (
-    echo 文件哈希值：> output\Windows\OHScrcpy_hash.txt
-    echo ================================================================>> output\Windows\OHScrcpy_hash.txt
-    echo dist\OHScrcpy.exe MD5>> output\Windows\OHScrcpy_hash.txt
+    echo 文件哈希值：> output\Windows\%ARCH%\OHScrcpy_hash.txt
+    echo ================================================================>> output\Windows\%ARCH%\OHScrcpy_hash.txt
+    echo dist\OHScrcpy.exe MD5>> output\Windows\%ARCH%\OHScrcpy_hash.txt
     for /f "skip=1 delims=" %%i in ('certutil -hashfile dist\OHScrcpy.exe MD5') do (
-        echo %%i>> output\Windows\OHScrcpy_hash.txt 2>nul
+        echo %%i>> output\Windows\%ARCH%\OHScrcpy_hash.txt 2>nul
         goto:exit_md5_loop
     )
     
     :exit_md5_loop
-    echo.>> output\Windows\OHScrcpy_hash.txt
-    echo dist\OHScrcpy.exe SHA256>> output\Windows\OHScrcpy_hash.txt
+    echo.>> output\Windows\%ARCH%\OHScrcpy_hash.txt
+    echo dist\OHScrcpy.exe SHA256>> output\Windows\%ARCH%\OHScrcpy_hash.txt
     for /f "skip=1 delims=" %%i in ('certutil -hashfile dist\OHScrcpy.exe SHA256') do (
-        echo %%i>> output\Windows\OHScrcpy_hash.txt 2>nul
+        echo %%i>> output\Windows\%ARCH%\OHScrcpy_hash.txt 2>nul
         goto:exit_sha256_loop
     )
     
     :exit_sha256_loop
-    echo ================================================================>> output\Windows\OHScrcpy_hash.txt
-    echo [完成] 哈希文件已生成：OHScrcpy_hash.txt
+    echo ================================================================>> output\Windows\%ARCH%\OHScrcpy_hash.txt
+    echo [完成] 哈希文件已生成：output\Windows\%ARCH%\OHScrcpy_hash.txt
     goto:succ_end
 ) else (
     echo [警告] 无法生成哈希文件（certutil不存在）
@@ -211,10 +245,96 @@ if %errorlevel% equ 0 (
 
 :succ_end
 echo.
+echo ******************************
+echo [信息] 检查日志脚本（Windows平台）...
+echo ******************************
+
+REM 只打包当前平台的日志脚本（Windows只打包.bat脚本）
+set LOG_SCRIPTS=
+set LOG_SCRIPTS_PS=
+if exist fetch_server_logs.bat (
+    set LOG_SCRIPTS=%LOG_SCRIPTS% fetch_server_logs.bat
+    if defined LOG_SCRIPTS_PS (
+        set LOG_SCRIPTS_PS=%LOG_SCRIPTS_PS%,fetch_server_logs.bat
+    ) else (
+        set LOG_SCRIPTS_PS=fetch_server_logs.bat
+    )
+)
+if exist delete_server_logs.bat (
+    set LOG_SCRIPTS=%LOG_SCRIPTS% delete_server_logs.bat
+    if defined LOG_SCRIPTS_PS (
+        set LOG_SCRIPTS_PS=%LOG_SCRIPTS_PS%,delete_server_logs.bat
+    ) else (
+        set LOG_SCRIPTS_PS=delete_server_logs.bat
+    )
+)
+if exist fetch_and_delete_server_logs.bat (
+    set LOG_SCRIPTS=%LOG_SCRIPTS% fetch_and_delete_server_logs.bat
+    if defined LOG_SCRIPTS_PS (
+        set LOG_SCRIPTS_PS=%LOG_SCRIPTS_PS%,fetch_and_delete_server_logs.bat
+    ) else (
+        set LOG_SCRIPTS_PS=fetch_and_delete_server_logs.bat
+    )
+)
+
+if not defined LOG_SCRIPTS (
+    echo [警告] 未找到日志脚本文件
+) else (
+    echo [信息] 包含日志脚本（Windows平台）：%LOG_SCRIPTS%
+)
+
+echo.
+echo ******************************
+echo [信息] 创建发布ZIP包...
+echo ******************************
+
+set ZIP_NAME=OHScrcpy_Exec_Windows_%ARCH%_%VERSION%.zip
+set ZIP_PATH=output\Windows\%ARCH%\%ZIP_NAME%
+
+REM 拷贝日志脚本到output目录
+if defined LOG_SCRIPTS (
+    for %%s in (%LOG_SCRIPTS%) do (
+        if exist %%s copy %%s output\Windows\%ARCH%\ >nul
+    )
+)
+
+cd output\Windows\%ARCH%
+
+if defined LOG_SCRIPTS (
+    echo [信息] 包含日志脚本到ZIP包...
+    if exist ..\..\..\..\tools\7z.exe (
+        ..\..\..\..\tools\7z.exe a -tzip %ZIP_NAME% OHScrcpy.exe OHScrcpy_hash.txt %LOG_SCRIPTS%
+    ) else (
+        powershell -Command "Compress-Archive -Path OHScrcpy.exe,OHScrcpy_hash.txt,%LOG_SCRIPTS_PS% -DestinationPath %ZIP_NAME% -Force"
+    )
+) else (
+    if exist ..\..\..\..\tools\7z.exe (
+        ..\..\..\..\tools\7z.exe a -tzip %ZIP_NAME% OHScrcpy.exe OHScrcpy_hash.txt
+    ) else (
+        powershell -Command "Compress-Archive -Path OHScrcpy.exe,OHScrcpy_hash.txt -DestinationPath %ZIP_NAME% -Force"
+    )
+)
+
+cd ..\..\..
+if exist output\Windows\%ARCH%\%ZIP_NAME% (
+    echo [完成] ZIP包已创建: %ZIP_PATH%
+    dir output\Windows\%ARCH%\%ZIP_NAME%
+) else (
+    echo [警告] ZIP包创建失败
+)
+
+echo.
 echo =============================================
 echo OpenHarmony OHScrcpy 自动化打包完成！
 echo =============================================
-echo 输出目录：output\Windows\
+echo 输出目录：output\Windows\%ARCH%\
+echo 生成文件：
+echo   - OHScrcpy.exe
+echo   - OHScrcpy_hash.txt
+if defined LOG_SCRIPTS (
+    echo   - 日志脚本（3个.bat文件）
+)
+echo   - %ZIP_NAME%
 echo.
 pause
 goto:eof

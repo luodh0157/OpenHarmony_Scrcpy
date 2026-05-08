@@ -14,6 +14,25 @@
 
 ## 开发指南
 
+### 目录结构
+```
+Server/
+├── bin/                      # 预置二进制可执行文件目录
+├── include/                  # 头文件目录
+├── src/                      # 源文件目录
+├── BUILD.gn                  # OpenHarmony编译配置脚本
+├── build_ohscrcpy_server.sh  # 服务端编译脚本
+├── install_ohscrcpy_server.bat # 服务端安装脚本（Windows）
+├── install_ohscrcpy_server.sh  # 服务端安装脚本（Linux）
+├── ohscrcpy_server.cfg       # 服务端运行权限配置
+├── ohscrcpy_server.patch     # 服务端嵌入编译配置补丁
+├── start_ohscrcpy_server.bat # 服务端启动脚本（Windows）
+├── start_ohscrcpy_server.sh  # 服务端启动脚本（Linux）
+├── uninstall_ohscrcpy_server.bat # 服务端卸载脚本（Windows）
+├── uninstall_ohscrcpy_server.sh  # 服务端卸载脚本（Linux）
+└── README.md                 # 本说明文档
+```
+
 ### 核心模块
    1. **NetworkStreamer**：网络传输模块
    2. **VideoEncoder**：视频编码模块
@@ -32,7 +51,7 @@
    repo sync -c --no-tags -j`nproc`
    ```
    2. 在`foundation/multimedia/player_framework/`目录下新建`OHScrcpy_Server`目录
-   3. 将本项目`Server`目录中的`BUILD.gn ohscrcpy_server.cpp ohscrcpy_server.cfg`拷贝至上一步新建的`OHScrcpy_Server`目录下
+   3. 将本项目`Server`目录中的`BUILD.gn`、`include/`、`src/`、`ohscrcpy_server.cfg`拷贝至上一步新建的`OHScrcpy_Server`目录下
    4. 将本项目`Server`目录中的`ohscrcpy_server.patch`拷贝至`foundation/multimedia/player_framework/`目录下
    5. 在`foundation/multimedia/player_framework/`目录下执行`git apply ohscrcpy_server.patch`，打上编译配置补丁
    6. 在OpenHarmony全仓代码的根目录下，执行如下编译命令：
@@ -50,6 +69,60 @@
 
 ### 启动方法
    执行`Server`目录下的`start_ohscrcpy_server`脚本即可启动，Windows平台使用`start_ohscrcpy_server.bat`，Linux平台使用`start_ohscrcpy_server.sh`
+
+## 日志系统
+
+### 服务端日志功能
+
+服务端支持日志记录功能，便于问题排查和调试。
+
+#### 启用日志
+- **自动启用**：客户端启动服务端时自动添加`--log`参数
+- **手动启用**：
+  ```bash
+  hdc shell /system/bin/ohscrcpy_server -p 27183 --log
+  ```
+
+#### 日志配置
+- **日志位置**：`/data/local/tmp/server_PID_YYYYMMDD_HHMMSS.log`
+- **命名规则**：包含进程PID，支持多客户端并发场景精确识别
+- **日志内容**：编码器状态、网络传输、错误信息等关键信息
+
+#### 拉取日志到本地
+使用客户端提供的日志管理脚本拉取服务端日志：
+
+**Linux/Mac**：
+```bash
+./fetch_server_logs.sh 12345  # 精确拉取（指定PID）
+./fetch_server_logs.sh        # 批量拉取（所有日志）
+```
+
+**Windows**：
+```cmd
+fetch_server_logs.bat 12345   # 精确拉取（指定PID）
+fetch_server_logs.bat         # 批量拉取（所有日志）
+```
+
+**说明**：
+- 日志拉取到本地`logs/`目录
+- 不删除设备上的原始日志文件
+- 脚本优先使用内置hdc工具
+
+#### 清理日志
+
+**Linux/Mac**：
+```bash
+./delete_server_logs.sh 12345  # 精确删除（无需确认）
+./delete_server_logs.sh        # 批量删除（需确认）
+```
+
+**Windows**：
+```cmd
+delete_server_logs.bat 12345   # 精确删除（无需确认）
+delete_server_logs.bat         # 批量删除（需确认）
+```
+
+**注意**：删除前请确保服务端进程已停止。
 
 ## 免责声明
 本工具仅供学习和研究使用，请勿用于非法用途。使用本工具造成的任何后果，开发者概不负责。

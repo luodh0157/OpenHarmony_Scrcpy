@@ -15,10 +15,27 @@
    - `psutil`
    - `pyinstaller`
 
-## Executer打包方法
+## Installer打包方法
 
 ### 1. 准备依赖资源文件
-  将`Client/ohscrcpy_client.py`、`Server/bin/rk3568/ohscrcpy_server`、`Server/ohscrcpy_server.cfg`三个文件拷贝到`Package/Installer`目录下，将`Server/bin/harmonyos/ohscrcpy_server`拷贝到`Package/Installer/HUAWEI`目录下。
+
+**推荐方式**：使用自动化准备脚本（自动完成所有文件拷贝）
+```bash
+# Linux/macOS
+./prepare_for_installer.sh
+
+# Windows
+prepare_for_installer.bat
+```
+
+**说明**：自动化脚本会自动拷贝所有必需文件到`Package/Installer`目录，无需手动操作。日志管理脚本无需拷贝，打包脚本会自动处理。
+
+**文件清单（供参考）**：
+- `Client/main.py` + `Client/core/` + `Client/video/` + `Client/gui/` + `Client/utils/` + `Client/config/`
+- `Client/hdc/` 目录（各平台HDC工具）
+- `Server/bin/rk3568/ohscrcpy_server`
+- `Server/ohscrcpy_server.cfg`
+- `Server/bin/harmonyos/ohscrcpy_server` → `HUAWEI/` 子目录
 
 ### 2. 运行打包脚本
   在`Package/Installer`目录下，运行`make_ohscrcpy_executer_onedir`打包脚本，开始自动进行可执行文件打包。
@@ -40,3 +57,26 @@
 
 ### 4. 打包输出路径
   `make_ohscrcpy_installer`打包脚本执行成功后，安装包文件`OHScrcpy_Setup_[{平台名}]_{版本号}`及其对应的hash文件`OHScrcpy_setup_[{平台名}]_hash.txt`会保存在`output`目录下对应的平台目录中。
+
+## 用户安装后的目录结构
+
+```
+安装目录/
+├── OHScrcpy.exe (可执行文件)
+├── fetch_server_logs.sh/bat (日志拉取脚本，在根目录)
+├── delete_server_logs.sh/bat (日志删除脚本，在根目录)
+├── fetch_and_delete_server_logs.sh/bat (二合一日志管理脚本，在根目录)
+├── logs/ (日志目录)
+├── docs/
+│   └── CHANGELOG.txt (版本更新记录)
+├── _internal/
+│   ├── Server/
+│   ├── hdc/
+│   └── ...Python依赖库
+└── ...其他文件
+```
+
+**使用方式**：
+1. 运行OHScrcpy.exe开始投屏
+2. 需要拉取服务端日志：运行`fetch_server_logs.sh/bat`
+3. 脚本优先使用_internal下的hdc，其次使用系统PATH中的hdc
