@@ -1,0 +1,8 @@
+{
+    "log_level": "INFO",
+    "log_to_file": true,
+    "log_dir": "logs",
+    "log_file": null,
+    "max_log_size_mb": 10,
+    "backup_count": 5
+}

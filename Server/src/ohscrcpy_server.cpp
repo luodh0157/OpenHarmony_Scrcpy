@@ -15,6 +15,8 @@
  
 /* OHScrcpy 服务端实现 - 基于OpenHarmony C-API */
 
+#include "../include/logger.h"
+
 #include <iostream>
 #include <thread>
 #include <atomic>
@@ -67,9 +69,13 @@
 #define PACKET_TYPE_CONFIG         0x00000005
 #define PACKET_TYPE_VPS            0x00000006
 #define PACKET_TYPE_CONFIG_DATA    0x00000007
+#define PACKET_TYPE_LOG            0x00000008
+
+// 日志文件路径前缀
+#define LOG_FILE_PREFIX "/data/local/tmp/server_"
 
 // 版本信息
-#define VERSION "v2.0"
+#define VERSION "v2.1"
 
 // H.264 NALU类型
 enum H264NaluType {
@@ -92,6 +98,7 @@ enum H265NaluType {
 
 using namespace OHOS;
 using namespace OHOS::Rosen;
+using namespace OHScrcpy;
 
 // 全局控制标志
 std::atomic<bool> g_running(false);
@@ -100,7 +107,7 @@ std::atomic<bool> g_streaming(false);
 
 // 信号处理
 void signal_handler(int signum) {
-    std::cout << "Received signal " << signum << ", shutting down..." << std::endl;
+    LOG_INFO("Server", "Received signal " + std::to_string(signum) + ", shutting down...");
     g_running = false;
     g_streaming = false;
 }
@@ -124,6 +131,7 @@ struct CommandLineArgs {
     int32_t bitrate = DEFAULT_BITRATE;
     bool show_help = false;
     bool show_version = false;
+    bool log_enabled = false;
 };
 
 // 视频流消息包头
@@ -142,21 +150,21 @@ public:
     
     bool initialize(int port) {
         if (server_fd_ >= 0) {
-            std::cout << "NetworkStreamer has been initialized" << std::endl;
+            LOG_INFO("Server", "NetworkStreamer has been initialized");
             return true;
         }
         
         // 创建socket
         server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
         if (server_fd_ < 0) {
-            std::cerr << "Failed to create socket: " << strerror(errno) << std::endl;
+            LOG_ERROR("Server", "Failed to create socket: " + std::string(strerror(errno)));
             return false;
         }
         
         // 设置socket选项
         int opt = 1;
         if (setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-            std::cerr << "Failed to set SO_REUSEADDR: " << strerror(errno) << std::endl;
+            LOG_ERROR("Server", "Failed to set SO_REUSEADDR: " + std::string(strerror(errno)));
         }
         
         // 设置非阻塞
@@ -170,17 +178,17 @@ public:
         addr.sin_port = htons(port);
         
         if (bind(server_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-            std::cerr << "Failed to bind socket: " << strerror(errno) << std::endl;
+            LOG_ERROR("Server", "Failed to bind socket: " + std::string(strerror(errno)));
             return false;
         }
         
         // 开始监听
         if (listen(server_fd_, MAX_CLIENTS) < 0) {
-            std::cerr << "Failed to listen on socket: " << strerror(errno) << std::endl;
+            LOG_ERROR("Server", "Failed to listen on socket: " + std::string(strerror(errno)));
             return false;
         }
         
-        std::cout << "Network streamer initialized on port " << port << std::endl;
+        LOG_INFO("Server", "Network streamer initialized on port " + std::to_string(port));
         return true;
     }
     
@@ -194,7 +202,7 @@ public:
         
         if (client_fd_ < 0) {
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                std::cerr << "Failed to accept client: " << strerror(errno) << std::endl;
+                LOG_ERROR("Server", "Failed to accept client: " + std::string(strerror(errno)));
             }
             return false;
         }
@@ -208,9 +216,8 @@ public:
         
         char client_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr_.sin_addr, client_ip, sizeof(client_ip));
-        std::cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-        std::cout << "Client connected from " << client_ip << ":" 
-                  << ntohs(client_addr_.sin_port) << std::endl;
+        LOG_INFO("Server", "++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+        LOG_INFO("Server", "Client connected from " + std::string(client_ip) + ":" + std::to_string(ntohs(client_addr_.sin_port)));
         
         g_client_connected = true;
         last_heartbeat_time_ = std::chrono::steady_clock::now();
@@ -225,12 +232,12 @@ public:
         ssize_t n = recv(client_fd_, buf, sizeof(buf), MSG_PEEK | MSG_DONTWAIT);
         
         if (n == 0) {
-            std::cout << "Client closed connection" << std::endl;
+            LOG_INFO("Server", "Client closed connection");
             disconnectClient();
             return false;
         } else if (n < 0) {
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                std::cout << "Socket error: " << strerror(errno) << std::endl;
+                LOG_INFO("Server", "Socket error: " + std::string(strerror(errno)));
                 disconnectClient();
                 return false;
             }
@@ -241,7 +248,7 @@ public:
     
     bool sendData(const void* data, size_t size) {
         if (client_fd_ < 0) {
-            std::cerr << "Invalid client fd" << std::endl;
+            LOG_ERROR("Server", "Invalid client fd");
             return false;
         }
 
@@ -256,12 +263,11 @@ public:
                                size - total_sent, MSG_NOSIGNAL);
             if (sent < 0) {
                 if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                    // 缓冲区满，等待
-                    std::cout << "Buffer is full, wait a moment..." << std::endl;
+                    LOG_INFO("Server", "Buffer is full, wait a moment...");
                     usleep(1000);
                     continue;
                 } else {
-                    std::cerr << "Failed to send data: " << strerror(errno) << std::endl;
+                    LOG_ERROR("Server", "Failed to send data: " + std::string(strerror(errno)));
                     disconnectClient();
                     return false;
                 }
@@ -287,7 +293,7 @@ public:
             default: type_name = "UNKNOWN"; break;
         }
         if (packet_type != PACKET_TYPE_HEARTBEAT) {
-            std::cout << "Send packet: type=" << type_name << ", size=" << size << " bytes" << std::endl;
+            LOG_INFO("Server", "Send packet: type=" + std::string(type_name) + ", size=" + std::to_string(size) + " bytes");
         }
 
         VideoPacketHeader header = {
@@ -321,9 +327,9 @@ public:
 
         bool succ = sendData(config_str.c_str(), config_str.length());
         if (succ) {
-            std::cout << "sendConfig to client succ, " << config_str;
+            LOG_INFO("Server", "sendConfig to client succ, " + config_str);
         } else {
-            std::cout << "sendConfig to client fail, " << config_str;
+            LOG_INFO("Server", "sendConfig to client fail, " + config_str);
         }
         return succ;
     }
@@ -344,7 +350,7 @@ public:
                     return true;
                 }
             } else if (received < 0 && errno != EWOULDBLOCK && errno != EAGAIN) {
-                std::cerr << "receiveAck fail, received:" << received << " errno:" << errno << std::endl;
+                LOG_ERROR("Server", "receiveAck fail, received:" + std::to_string(received) + " errno:" + std::to_string(errno));
                 break;
             }
             usleep(5000);  // 5ms
@@ -356,7 +362,7 @@ public:
     bool parseConfigAck(char *buffer, size_t size) {
         char *cfg_ack = strstr(buffer, "CONFIG_ACK");
         if (cfg_ack == nullptr) {
-            std::cerr << "invalid ACK: no include CONFIG_ACK" << std::endl;
+            LOG_ERROR("Server", "invalid ACK: no include CONFIG_ACK");
             return false;
         }
         return true;
@@ -369,7 +375,7 @@ public:
             uint32_t net_counter = htonl(heartbeat_counter);
             
             if (!sendPacket(&net_counter, sizeof(heartbeat_counter), PACKET_TYPE_HEARTBEAT)) {
-                std::cout << "Failed to send heartbeat, connection may be lost" << std::endl;
+                LOG_INFO("Server", "Failed to send heartbeat, connection may be lost");
             }
             
             last_heartbeat_time_ = std::chrono::steady_clock::now();
@@ -383,7 +389,7 @@ public:
             memset(&client_addr_, 0, sizeof(client_addr_));
         }
         g_client_connected = false;
-        std::cout << "Client disconnected" << std::endl;
+        LOG_INFO("Server", "Client disconnected");
     }
     
     void closeAll() {
@@ -464,11 +470,11 @@ public:
                 if (nalu_type == NALU_TYPE_SPS) {
                     sps = std::move(nalu);
                     found_sps = true;
-                    std::cout << "Found SPS: " << sps.size() << " bytes" << std::endl;
+                    LOG_INFO("Server", "Found SPS: " + std::to_string(sps.size()) + " bytes");
                 } else if (nalu_type == NALU_TYPE_PPS) {
                     pps = std::move(nalu);
                     found_pps = true;
-                    std::cout << "Found PPS: " << pps.size() << " bytes" << std::endl;
+                    LOG_INFO("Server", "Found PPS: " + std::to_string(pps.size()) + " bytes");
                 }
                 
                 pos = nalu_end;
@@ -559,15 +565,15 @@ public:
                 if (nalu_type == H265_NALU_TYPE_VPS) {
                     vps = std::move(nalu);
                     found_vps = true;
-                    std::cout << "Found VPS: " << vps.size() << " bytes" << std::endl;
+                    LOG_INFO("Server", "Found VPS: " + std::to_string(vps.size()) + " bytes");
                 } else if (nalu_type == H265_NALU_TYPE_SPS) {
                     sps = std::move(nalu);
                     found_sps = true;
-                    std::cout << "Found SPS: " << sps.size() << " bytes" << std::endl;
+                    LOG_INFO("Server", "Found SPS: " + std::to_string(sps.size()) + " bytes");
                 } else if (nalu_type == H265_NALU_TYPE_PPS) {
                     pps = std::move(nalu);
                     found_pps = true;
-                    std::cout << "Found PPS: " << pps.size() << " bytes" << std::endl;
+                    LOG_INFO("Server", "Found PPS: " + std::to_string(pps.size()) + " bytes");
                 }
                 
                 pos = nalu_end;
@@ -625,34 +631,31 @@ public:
     
     ~VideoEncoder() { release(); }
 
-    void printAvcVideoCodecCapability() {
-        std::cout << "------------------------------------------------------" << std::endl;
-        std::cout << "AVC(H.264) Video Codec Capability Info: " << std::endl;
+void printAvcVideoCodecCapability() {
+        LOG_INFO("Server", "------------------------------------------------------");
+        LOG_INFO("Server", "AVC(H.264) Video Codec Capability Info: ");
         OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(OH_AVCODEC_MIMETYPE_VIDEO_AVC, true, HARDWARE);
         if (capability == nullptr) {
-            std::cerr << "OH_AVCodec_GetCapabilityByCategory fail" << std::endl;
+            LOG_ERROR("Server", "OH_AVCodec_GetCapabilityByCategory fail");
             return;
         }
-        // 获取H.264解码器名称
-        const char *codecName = OH_AVCapability_GetName(capability);
-        std::cout << "  CodecName: " << codecName << std::endl;
+const char *codecName = OH_AVCapability_GetName(capability);
+        LOG_INFO("Server", "  CodecName: " + std::string(codecName));
 
         bool isSupported = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_CBR);
         bool isSupported2 = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_VBR);
         bool isSupported3 = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_CQ);
-        std::cout << "  BitRateModeSupported: CBR[" << isSupported << "], VBR[" << isSupported2 << "], CQ[" 
-                  << isSupported3 << "]" << std::endl;
+        LOG_INFO("Server", "  BitRateModeSupported: CBR[" + std::to_string(isSupported) + "], VBR[" + std::to_string(isSupported2) + "], CQ[" + std::to_string(isSupported3) + "]");
 
-        // 获取码率范围
         OH_AVRange bitrateRange = {-1, -1};
         int32_t ret = OH_AVCapability_GetEncoderBitrateRange(capability, &bitrateRange);
         if (ret == AV_ERR_OK) {
-            std::cout << "  BitRateRange: [" << bitrateRange.minVal << "~" << bitrateRange.maxVal << "]";
+            LOG_INFO("Server", "  BitRateRange: [" + std::to_string(bitrateRange.minVal) + "~" + std::to_string(bitrateRange.maxVal) + "]");
         }
         OH_AVRange qualityRange = {-1, -1};
         ret = OH_AVCapability_GetEncoderQualityRange(capability, &qualityRange);
         if (ret == AV_ERR_OK) {
-            std::cout << "QualityRange: [" << qualityRange.minVal << "~" << qualityRange.maxVal << "]" << std::endl;
+            LOG_INFO("Server", "QualityRange: [" + std::to_string(qualityRange.minVal) + "~" + std::to_string(qualityRange.maxVal) + "]");
         }
 
         // 获取profile范围
@@ -660,12 +663,13 @@ public:
         uint32_t profileNum = 0;
         ret = OH_AVCapability_GetSupportedProfiles(capability, &profiles, &profileNum);
         if (ret == AV_ERR_OK) {
-            std::cout << "  SupportedProfiles: [";
+            std::string profileStr = "  SupportedProfiles: [";
             for (uint32_t i = 0; i < profileNum; i++) {
-                std::cout << profiles[i];
-                if (i < profileNum - 1) std::cout << ",";
+                profileStr += std::to_string(profiles[i]);
+                if (i < profileNum - 1) profileStr += ",";
             }
-            std::cout << "]" << std::endl;
+            profileStr += "]";
+            LOG_INFO("Server", profileStr);
         }
 
         // 获取AVC_PROFILE_MAIN对应的Level范围
@@ -674,143 +678,138 @@ public:
         uint32_t levelNum = 0;
         ret = OH_AVCapability_GetSupportedLevelsForProfile(capability, profile, &levels, &levelNum);
         if (ret == AV_ERR_OK) {
-            std::cout << "  SupportedLevelsForProfile " << profile << ": [";
+            std::string levelStr = "  SupportedLevelsForProfile " + std::to_string(profile) + ": [";
             for (uint32_t i = 1; i < levelNum; i++) {
-               std::cout << levels[i];
-               if (i < levelNum - 1) std::cout << ",";
+               levelStr += std::to_string(levels[i]);
+               if (i < levelNum - 1) levelStr += ",";
             }
-            std::cout << "]" << std::endl;
+            levelStr += "]";
+            LOG_INFO("Server", levelStr);
         }
 
         // 获取支持的宽范围
-        OH_AVRange widthRange = {-1, -1};
+OH_AVRange widthRange = {-1, -1};
         ret = OH_AVCapability_GetVideoWidthRange(capability, &widthRange);
         if (ret == AV_ERR_OK) {
-            std::cout << "  WidthRange: [" << widthRange.minVal << "," << widthRange.maxVal << "]";
+            LOG_INFO("Server", "  WidthRange: [" + std::to_string(widthRange.minVal) + "," + std::to_string(widthRange.maxVal) + "]");
         }
-        // 获取支持的高范围
         OH_AVRange heightRange = {-1, -1};
         ret = OH_AVCapability_GetVideoHeightRange(capability, &heightRange);
         if (ret == AV_ERR_OK) {
-            std::cout << ", HeightRange: [" << heightRange.minVal << "," << heightRange.maxVal << "]";
+            LOG_INFO("Server", ", HeightRange: [" + std::to_string(heightRange.minVal) + "," + std::to_string(heightRange.maxVal) + "]");
         }
-        // 获取支持的帧率范围
-        OH_AVRange frameRateRange = {-1, -1};
+OH_AVRange frameRateRange = {-1, -1};
         ret = OH_AVCapability_GetVideoFrameRateRange(capability, &frameRateRange);
         if (ret == AV_ERR_OK) {
-            std::cout << ", FrameRateRange: [" << frameRateRange.minVal << "," << frameRateRange.maxVal << "]" << std::endl;
+            LOG_INFO("Server", ", FrameRateRange: [" + std::to_string(frameRateRange.minVal) + "," + std::to_string(frameRateRange.maxVal) + "]");
         }
 
-        // 获取宽对齐要求
         int32_t widthAlignment = 0;
         ret = OH_AVCapability_GetVideoWidthAlignment(capability, &widthAlignment);
         if (ret == AV_ERR_OK) {
-            std::cout << "  WidthAlignment: " << widthAlignment;
+            LOG_INFO("Server", "  WidthAlignment: " + std::to_string(widthAlignment));
         }
-        // 获取高对齐要求
-        int32_t heightAlignment = 0;
+int32_t heightAlignment = 0;
         ret = OH_AVCapability_GetVideoHeightAlignment(capability, &heightAlignment);
         if (ret == AV_ERR_OK) {
-            std::cout << ", HeightAlignment: " << heightAlignment << std::endl;
+            LOG_INFO("Server", ", HeightAlignment: " + std::to_string(heightAlignment));
         }
 
-        // 获取支持的像素格式
-        const int32_t *pixFormats = nullptr;
+const int32_t *pixFormats = nullptr;
         uint32_t pixFormatNum = 0;
         ret = OH_AVCapability_GetVideoSupportedPixelFormats(capability, &pixFormats, &pixFormatNum);
         if (ret == AV_ERR_OK) {
-            std::cout << "  SupportedPixelFormats: [";
+            std::string pixStr = "  SupportedPixelFormats: [";
             for (uint32_t i = 1; i < pixFormatNum; i++) {
-               std::cout << pixFormats[i];
-               if (i < pixFormatNum - 1) std::cout << ",";
+               pixStr += std::to_string(pixFormats[i]);
+               if (i < pixFormatNum - 1) pixStr += ",";
             }
-            std::cout << "]" << std::endl;
+            pixStr += "]";
+            LOG_INFO("Server", pixStr);
         }
-        // 获取是否支持低时延特性
         isSupported = OH_AVCapability_IsFeatureSupported(capability, VIDEO_LOW_LATENCY);
-        std::cout << "  IsFeatureSupported VIDEO_LOW_LATENCY: " << isSupported << std::endl;
+        LOG_INFO("Server", "  IsFeatureSupported VIDEO_LOW_LATENCY: " + std::to_string(isSupported));
 
         int32_t width = 720;
         int32_t height = 1280;
         // 获取指定视频宽高是否支持
-        isSupported = OH_AVCapability_IsVideoSizeSupported(capability, width, height);
-        std::cout << "  [720*1280] IsVideoSizeSupported: " << isSupported;
-        // 获取指定视频尺寸支持的帧率范围
+isSupported = OH_AVCapability_IsVideoSizeSupported(capability, width, height);
+        LOG_INFO("Server", "  [720*1280] IsVideoSizeSupported: " + std::to_string(isSupported));
         frameRateRange = {-1, -1};
         ret = OH_AVCapability_GetVideoFrameRateRangeForSize(capability, width, height, &frameRateRange);
         if (ret == AV_ERR_OK) {
-            std::cout << ", FrameRateRange: [" << frameRateRange.minVal << "," << frameRateRange.maxVal << "]" << std::endl;
+            LOG_INFO("Server", ", FrameRateRange: [" + std::to_string(frameRateRange.minVal) + "," + std::to_string(frameRateRange.maxVal) + "]");
         }
 
-        std::cout << "------------------------------------------------------" << std::endl;
+        LOG_INFO("Server", "------------------------------------------------------");
     }
     
     void printHevcVideoCodecCapability() {
-        std::cout << "------------------------------------------------------" << std::endl;
-        std::cout << "HEVC(H.265) Video Codec Capability Info: " << std::endl;
+        LOG_INFO("Server", "------------------------------------------------------");
+        LOG_INFO("Server", "HEVC(H.265) Video Codec Capability Info: ");
         OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(OH_AVCODEC_MIMETYPE_VIDEO_HEVC, true, HARDWARE);
         if (capability == nullptr) {
-            std::cout << "  H265 encoder NOT supported" << std::endl;
-            std::cout << "------------------------------------------------------" << std::endl;
+            LOG_INFO("Server", "  H265 encoder NOT supported");
+            LOG_INFO("Server", "------------------------------------------------------");
             return;
         }
         const char *codecName = OH_AVCapability_GetName(capability);
-        std::cout << "  CodecName: " << codecName << std::endl;
+        LOG_INFO("Server", "  CodecName: " + std::string(codecName));
 
         bool isSupported = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_CBR);
         bool isSupported2 = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_VBR);
         bool isSupported3 = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_CQ);
-        std::cout << "  BitRateModeSupported: CBR[" << isSupported << "], VBR[" << isSupported2 << "], CQ[" 
-                  << isSupported3 << "]" << std::endl;
+        LOG_INFO("Server", "  BitRateModeSupported: CBR[" + std::to_string(isSupported) + "], VBR[" + std::to_string(isSupported2) + "], CQ[" + std::to_string(isSupported3) + "]");
 
         OH_AVRange bitrateRange = {-1, -1};
         int32_t ret = OH_AVCapability_GetEncoderBitrateRange(capability, &bitrateRange);
         if (ret == AV_ERR_OK) {
-            std::cout << "  BitRateRange: [" << bitrateRange.minVal << "~" << bitrateRange.maxVal << "]" << std::endl;
+            LOG_INFO("Server", "  BitRateRange: [" + std::to_string(bitrateRange.minVal) + "~" + std::to_string(bitrateRange.maxVal) + "]");
         }
 
         OH_AVRange widthRange = {-1, -1}, heightRange = {-1, -1};
         ret = OH_AVCapability_GetVideoWidthRange(capability, &widthRange);
         if (ret == AV_ERR_OK) {
-            std::cout << "  WidthRange: [" << widthRange.minVal << "~" << widthRange.maxVal << "]" << std::endl;
+            LOG_INFO("Server", "  WidthRange: [" + std::to_string(widthRange.minVal) + "~" + std::to_string(widthRange.maxVal) + "]");
         }
         ret = OH_AVCapability_GetVideoHeightRange(capability, &heightRange);
         if (ret == AV_ERR_OK) {
-            std::cout << "  HeightRange: [" << heightRange.minVal << "~" << heightRange.maxVal << "]" << std::endl;
+            LOG_INFO("Server", "  HeightRange: [" + std::to_string(heightRange.minVal) + "~" + std::to_string(heightRange.maxVal) + "]");
         }
 
         int32_t widthAlignment = 0, heightAlignment = 0;
         OH_AVCapability_GetVideoWidthAlignment(capability, &widthAlignment);
         OH_AVCapability_GetVideoHeightAlignment(capability, &heightAlignment);
-        std::cout << "  Alignment: " << widthAlignment << "x" << heightAlignment << std::endl;
+        LOG_INFO("Server", "  Alignment: " + std::to_string(widthAlignment) + "x" + std::to_string(heightAlignment));
 
         OH_AVRange frameRateRange = {-1, -1};
         ret = OH_AVCapability_GetVideoFrameRateRange(capability, &frameRateRange);
         if (ret == AV_ERR_OK) {
-            std::cout << "  FrameRateRange: [" << frameRateRange.minVal << "~" << frameRateRange.maxVal << "]" << std::endl;
+            LOG_INFO("Server", "  FrameRateRange: [" + std::to_string(frameRateRange.minVal) + "~" + std::to_string(frameRateRange.maxVal) + "]");
         }
 
         const int32_t *profiles = nullptr;
         uint32_t profileNum = 0;
         OH_AVCapability_GetSupportedProfiles(capability, &profiles, &profileNum);
         if (profiles != nullptr && profileNum > 0) {
-            std::cout << "  SupportedProfiles: [";
+            std::string profileStr = "  SupportedProfiles: [";
             for (uint32_t i = 0; i < profileNum; i++) {
-                std::cout << profiles[i];
-                if (i < profileNum - 1) std::cout << ",";
+                profileStr += std::to_string(profiles[i]);
+                if (i < profileNum - 1) profileStr += ",";
             }
-            std::cout << "]" << std::endl;
+            profileStr += "]";
+            LOG_INFO("Server", profileStr);
         }
 
-        std::cout << "------------------------------------------------------" << std::endl;
+        LOG_INFO("Server", "------------------------------------------------------");
     }
     
     bool initialize(const ScreenInfo& info, NetworkStreamer* streamer) {
         if (encoder_ != nullptr) {
-            std::cout << "VideoEncoder has been initialized" << std::endl;
+            LOG_INFO("Server", "VideoEncoder has been initialized");
             return true;
         }
-        std::cout << "Initializing VideoEncoder..." << std::endl;
+        LOG_INFO("Server", "Initializing VideoEncoder...");
 
         bool is_hevc = (info.codec == "h265");
         
@@ -827,7 +826,7 @@ public:
             encoder_ = OH_VideoEncoder_CreateByMime(OH_AVCODEC_MIMETYPE_VIDEO_AVC);
         }
         if (encoder_ == nullptr) {
-            std::cerr << "OH_VideoEncoder_CreateByMime fail for codec: " << info.codec << std::endl;
+            LOG_ERROR("Server", "OH_VideoEncoder_CreateByMime fail for codec: " + info.codec);
             return false;
         }
 
@@ -840,14 +839,14 @@ public:
         };
         int32_t ret = OH_VideoEncoder_RegisterCallback(encoder_, callback, this);
         if (ret != AV_ERR_OK) {
-            std::cerr << "OH_VideoEncoder_RegisterCallback fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_VideoEncoder_RegisterCallback fail, err: " + std::to_string(ret));
             return false;
         }
         
         // 创建并配置编码格式
         OH_AVFormat* format = OH_AVFormat_Create();
         if (format == nullptr) {
-            std::cerr << "OH_AVFormat_Create fail" << std::endl;
+            LOG_ERROR("Server", "OH_AVFormat_Create fail");
             return false;
         }
         // 设置编码参数
@@ -869,23 +868,22 @@ public:
         // 配置编码器
         ret = OH_VideoEncoder_Configure(encoder_, format);
         if (ret != AV_ERR_OK && ret != AV_ERR_INVALID_VAL) {
-            std::cerr << "OH_VideoEncoder_Configure fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_VideoEncoder_Configure fail, err: " + std::to_string(ret));
             OH_AVFormat_Destroy(format);
             return false;
         }
         OH_AVFormat_Destroy(format);
         
         // 获取编码器的Surface
-        ret = OH_VideoEncoder_GetSurface(encoder_, &surface_);
+ret = OH_VideoEncoder_GetSurface(encoder_, &surface_);
         if (ret != AV_ERR_OK || surface_ == nullptr) {
-            std::cerr << "OH_VideoEncoder_GetSurface fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_VideoEncoder_GetSurface fail, err: " + std::to_string(ret));
             return false;
         }
 
-        // 准备编码器
         ret = OH_VideoEncoder_Prepare(encoder_);
         if (ret != AV_ERR_OK) {
-            std::cerr << "OH_VideoEncoder_Prepare fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_VideoEncoder_Prepare fail, err: " + std::to_string(ret));
             return false;
         }
 
@@ -893,25 +891,25 @@ public:
         context_->screen_info = info;
         context_->params_sent = false;
         context_->is_hevc = is_hevc;
-        std::cout << "VideoEncoder initialized successfully for codec: " << info.codec << std::endl;
+        LOG_INFO("Server", "VideoEncoder initialized successfully for codec: " + info.codec);
         return true;
     }
     
     bool start() {
         if (encoder_ == nullptr) {
-            std::cerr << "VideoEncoder has not been initialized" << std::endl;
+            LOG_ERROR("Server", "VideoEncoder has not been initialized");
             return false;
         }
         
         is_encoding_ = true;
         int32_t ret = OH_VideoEncoder_Start(encoder_);
         if (ret != AV_ERR_OK) {
-            std::cerr << "OH_VideoEncoder_Start fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_VideoEncoder_Start fail, err: " + std::to_string(ret));
             is_encoding_ = false;
             return false;
         }
 
-        std::cout << "VideoEncoder started" << std::endl;
+        LOG_INFO("Server", "VideoEncoder started");
         return true;
     }
     
@@ -938,45 +936,41 @@ public:
         
         // H.265需要发送VPS
         if (context_->is_hevc && !context_->vps_data.empty()) {
-            std::cout << "Sending VPS (" << context_->vps_data.size() << " bytes)" << std::endl;
+            LOG_INFO("Server", "Sending VPS (" + std::to_string(context_->vps_data.size()) + " bytes)");
             if (!context_->streamer->sendPacket(context_->vps_data.data(),
                                                context_->vps_data.size(),
                                                PACKET_TYPE_VPS)) {
-                std::cerr << "Failed to send VPS" << std::endl;
+                LOG_ERROR("Server", "Failed to send VPS");
                 return false;
             }
         }
         
         if (!context_->sps_data.empty() && !context_->pps_data.empty()) {
-            std::cout << "Sending SPS (" << context_->sps_data.size() << " bytes) and PPS (" 
-                    << context_->pps_data.size() << " bytes)" << std::endl;
+            LOG_INFO("Server", "Sending SPS (" + std::to_string(context_->sps_data.size()) + " bytes) and PPS (" + std::to_string(context_->pps_data.size()) + " bytes)");
             
-            // 发送视频配置信息
             if (!context_->streamer->sendVideoConfig(context_->screen_info)) {
-                std::cerr << "Failed to send video config" << std::endl;
+                LOG_ERROR("Server", "Failed to send video config");
                 return false;
             }
             
-            // 发送SPS
             if (!context_->streamer->sendPacket(context_->sps_data.data(), 
                                             context_->sps_data.size(), 
                                             PACKET_TYPE_SPS)) {
-                std::cerr << "Failed to send SPS" << std::endl;
+                LOG_ERROR("Server", "Failed to send SPS");
                 return false;
             }
             
-            // 发送PPS
             if (!context_->streamer->sendPacket(context_->pps_data.data(), 
                                             context_->pps_data.size(), 
                                             PACKET_TYPE_PPS)) {
-                std::cerr << "Failed to send PPS" << std::endl;
+                LOG_ERROR("Server", "Failed to send PPS");
                 return false;
             }
             context_->params_sent = true;
             return true;
         }
         
-        std::cerr << "No SPS/PPS data to send" << std::endl;
+        LOG_ERROR("Server", "No SPS/PPS data to send");
         return false;
     }
 
@@ -989,17 +983,16 @@ public:
     
     // 静态回调函数
     static void onError(OH_AVCodec* codec, int32_t errorCode, void* userData) {
-        std::cerr << "VideoEncoder error: " << errorCode << std::endl;
+        LOG_ERROR("Server", "VideoEncoder error: " + std::to_string(errorCode));
     }
     
     static void onStreamChanged(OH_AVCodec* codec, OH_AVFormat* format, void* userData) {
-        // Surface模式下，该回调函数在surface分辨率变化时触发
         (void)codec;
         (void)userData;
         int32_t width = 0, height = 0;
         OH_AVFormat_GetIntValue(format, OH_MD_KEY_WIDTH, &width);
         OH_AVFormat_GetIntValue(format, OH_MD_KEY_HEIGHT, &height);
-        std::cout << "VideoEncoder stream changed: " << width << "x" << height << std::endl;
+        LOG_INFO("Server", "VideoEncoder stream changed: " + std::to_string(width) + "x" + std::to_string(height));
     }
     
     static void onNeedInputBuffer(OH_AVCodec* codec, uint32_t index, OH_AVBuffer* buffer, void* userData) {
@@ -1017,21 +1010,21 @@ public:
         if (buffer != nullptr) {
             OH_AVErrCode ret = OH_AVBuffer_GetBufferAttr(buffer, &info);
             if (ret != AV_ERR_OK) {
-                std::cerr << "OH_AVBuffer_GetBufferAttr fail, err: " << ret << std::endl;
+                LOG_ERROR("Server", "OH_AVBuffer_GetBufferAttr fail, err: " + std::to_string(ret));
                 return;
             }
             uint32_t no_need_flags = AVCODEC_BUFFER_FLAGS_DISCARD | AVCODEC_BUFFER_FLAGS_DISPOSABLE | 
                 AVCODEC_BUFFER_FLAGS_EOS;
             if ((info.flags & no_need_flags) != 0) {
                 if ((info.flags & AVCODEC_BUFFER_FLAGS_EOS) != 0) {
-                    std::cout << "End-of-Stream frame" << std::endl;
+                    LOG_INFO("Server", "End-of-Stream frame");
                 }
                 OH_VideoEncoder_FreeOutputBuffer(codec, index);
                 return;
             }
             uint8_t *addr = OH_AVBuffer_GetAddr(buffer);
             if (addr == nullptr) {
-                std::cerr << "OH_AVBuffer_GetAddr fail" << std::endl;
+                LOG_ERROR("Server", "OH_AVBuffer_GetAddr fail");
                 return;
             }
             
@@ -1053,28 +1046,27 @@ public:
 
     static bool IsValidOnNewOutputBufferParam(OH_AVCodec* codec, OH_AVBuffer* buffer, void* userData) {
         if (!codec || !buffer) {
-            std::cerr << "Invalid codec or buffer in callback" << std::endl;
+            LOG_ERROR("Server", "Invalid codec or buffer in callback");
             return false;
         }
         
         VideoEncoder* self = static_cast<VideoEncoder*>(userData);
         if (!self || !self->context_ || !self->context_->streamer) {
-            std::cerr << "Invalid context in output buffer callback" << std::endl;
+            LOG_ERROR("Server", "Invalid context in output buffer callback");
             return false;
         }
         
         if (!self->isEncoding()) {
-            std::cout << "Encoder not in encoding state, skipping frame" << std::endl;
+            LOG_INFO("Server", "Encoder not in encoding state, skipping frame");
             return false;
         }
         return true;
     }
 
     static void handleCofingFrame(VideoEncoder* self, uint8_t *addr, size_t size) {
-        std::cout << "Received codec config data: " << size << " bytes" << std::endl;
+        LOG_INFO("Server", "Received codec config data: " + std::to_string(size) + " bytes");
         
         if (self->context_->is_hevc) {
-            // H.265: 提取VPS、SPS、PPS
             std::vector<uint8_t> vps, sps, pps;
             if (H265Utils::extractVpsSpsPpsAnnexB(addr, size, vps, sps, pps)) {
                 self->context_->vps_data = std::move(vps);
@@ -1085,10 +1077,9 @@ public:
                     self->sendCodecParams();
                 }
             } else {
-                std::cout << "Could not extract VPS/SPS/PPS from config data" << std::endl;
+                LOG_INFO("Server", "Could not extract VPS/SPS/PPS from config data");
             }
         } else {
-            // H.264: 提取SPS、PPS
             std::vector<uint8_t> sps, pps;
             if (H264Utils::extractSpsPpsAnnexB(addr, size, sps, pps)) {
                 self->context_->sps_data = std::move(sps);
@@ -1098,20 +1089,18 @@ public:
                     self->sendCodecParams();
                 }
             } else {
-                std::cout << "Could not extract SPS/PPS from config data" << std::endl;
+                LOG_INFO("Server", "Could not extract SPS/PPS from config data");
             }
         }
     }
 
     static void handleNormalFrame(VideoEncoder* self, uint8_t *addr, size_t size, uint32_t flags) {
-        // 处理视频帧数据
         bool is_keyframe = (flags & AVCODEC_BUFFER_FLAGS_SYNC_FRAME) > 0;
         uint32_t packet_type = is_keyframe ? PACKET_TYPE_KEYFRAME : PACKET_TYPE_FRAME;
         if ((flags & AVCODEC_BUFFER_FLAGS_INCOMPLETE_FRAME) > 0) {
-            std::cout << "Recv INCOMPLETE_FRAME" << std::endl;
+            LOG_INFO("Server", "Recv INCOMPLETE_FRAME");
         }
         
-        // 如果参数集尚未发送，尝试从关键帧数据中提取
         if (is_keyframe && !self->context_->params_sent.load()) {
             if (self->context_->is_hevc) {
                 std::vector<uint8_t> vps, sps, pps;
@@ -1121,7 +1110,7 @@ public:
                     self->context_->pps_data = std::move(pps);
                     self->sendCodecParams();
                 } else {
-                    std::cerr << "Failed to extract VPS/SPS/PPS from H.265 keyframe" << std::endl;
+                    LOG_ERROR("Server", "Failed to extract VPS/SPS/PPS from H.265 keyframe");
                 }
             } else {
                 std::vector<uint8_t> sps, pps;
@@ -1130,20 +1119,18 @@ public:
                     self->context_->pps_data = std::move(pps);
                     self->sendCodecParams();
                 } else {
-                    std::cerr << "Failed to extract SPS/PPS from keyframe" << std::endl;
+                    LOG_ERROR("Server", "Failed to extract SPS/PPS from keyframe");
                 }
             }
         }
         
-        // 发送视频数据
         if (self->context_->streamer->hasClient()) {
             self->context_->streamer->sendPacket((const void*)addr, size, packet_type);
             self->context_->frame_count++;
             
-            // 每100帧打印一次统计信息
             static uint64_t last_frame_count = 0;
             if ((last_frame_count != self->context_->frame_count) && (self->context_->frame_count % 100 == 0)) {
-                std::cout << "Sent " << self->context_->frame_count << " frames" << std::endl;
+                LOG_INFO("Server", "Sent " + std::to_string(self->context_->frame_count) + " frames");
                 last_frame_count = self->context_->frame_count;
             }
         }
@@ -1164,15 +1151,15 @@ public:
     
     bool initialize(const ScreenInfo& info, VideoEncoder* encoder, NetworkStreamer* streamer) {
         if (capture_ != nullptr) {
-            std::cout << "ScreenCapturer has been initialized" << std::endl;
+            LOG_INFO("Server", "ScreenCapturer has been initialized");
             return true;
         }
-        std::cout << "Initializing ScreenCapturer..." << std::endl;
+        LOG_INFO("Server", "Initializing ScreenCapturer...");
         
         // 创建屏幕捕获实例
         capture_ = OH_AVScreenCapture_Create();
         if (capture_ == nullptr) {
-            std::cerr << "OH_AVScreenCapture_Create fail" << std::endl;
+            LOG_ERROR("Server", "OH_AVScreenCapture_Create fail");
             return false;
         }
         
@@ -1211,7 +1198,7 @@ public:
         // 初始化捕获器
         int32_t ret = OH_AVScreenCapture_Init(capture_, config);
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
-            std::cerr << "OH_AVScreenCapture_Init fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_AVScreenCapture_Init fail, err: " + std::to_string(ret));
             return false;
         }
 
@@ -1221,21 +1208,19 @@ public:
         // 设置错误回调
         ret = OH_AVScreenCapture_SetErrorCallback(capture_, &ScreenCapturer::onError, this);
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
-            std::cerr << "OH_AVScreenCapture_SetErrorCallback fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_AVScreenCapture_SetErrorCallback fail, err: " + std::to_string(ret));
             return false;
         }
         
-        // 设置状态回调
         ret = OH_AVScreenCapture_SetStateCallback(capture_, &ScreenCapturer::onStateChange, this);
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
-            std::cerr << "OH_AVScreenCapture_SetStateCallback fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_AVScreenCapture_SetStateCallback fail, err: " + std::to_string(ret));
             return false;
         }
         
-        // 设置数据回调
         ret = OH_AVScreenCapture_SetDataCallback(capture_, &ScreenCapturer::onBufferAvailable, this);
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
-            std::cerr << "OH_AVScreenCapture_SetDataCallback fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_AVScreenCapture_SetDataCallback fail, err: " + std::to_string(ret));
             return false;
         }
         
@@ -1243,27 +1228,24 @@ public:
         encoder_ = encoder;
         streamer_ = streamer;
         screen_info_ = info;
-        std::cout << "Screen capturer initialized: " 
-                  << info.width << "x" << info.height 
-                  << "@" << info.fps << "fps" << std::endl;
+        LOG_INFO("Server", "Screen capturer initialized: " + std::to_string(info.width) + "x" + std::to_string(info.height) + "@" + std::to_string(info.fps) + "fps");
         return true;
     }
     
     bool start() {
         if (capture_ == nullptr || encoder_ == nullptr) {
-            std::cerr << "ScreenCapturer has not been initialized" << std::endl;
+            LOG_ERROR("Server", "ScreenCapturer has not been initialized");
             return false;
         }
         
-        // 以Surface模式开始屏幕录制
         int32_t ret = OH_AVScreenCapture_StartScreenCaptureWithSurface(capture_, encoder_->getSurface());
         if (ret != AV_SCREEN_CAPTURE_ERR_OK) {
-            std::cerr << "OH_AVScreenCapture_StartScreenCaptureWithSurface fail, err: " << ret << std::endl;
+            LOG_ERROR("Server", "OH_AVScreenCapture_StartScreenCaptureWithSurface fail, err: " + std::to_string(ret));
             return false;
         }
         
         is_capturing_ = true;
-        std::cout << "Screen capture started" << std::endl;
+        LOG_INFO("Server", "Screen capture started");
         return true;
     }
     
@@ -1310,28 +1292,26 @@ public:
     
     // 成员函数用于处理回调
     void handleError(OH_AVScreenCapture* capture, int32_t errorCode) {
-        std::cerr << "Screen capture error: " << errorCode << std::endl;
+        LOG_ERROR("Server", "Screen capture error: " + std::to_string(errorCode));
     }
     
     void handleStateChange(OH_AVScreenCapture* capture, OH_AVScreenCaptureStateCode stateCode) {
         if (stateCode == OH_SCREEN_CAPTURE_STATE_STARTED) {
-            std::cout << "Screen capture state: STARTED" << std::endl;
+            LOG_INFO("Server", "Screen capture state: STARTED");
         } else if (stateCode == OH_SCREEN_CAPTURE_STATE_STOPPED_BY_CALL) {
-            std::cout << "Screen capture state: STOPPED_BY_CALL" << std::endl;
+            LOG_INFO("Server", "Screen capture state: STOPPED_BY_CALL");
             is_capturing_ = false;
         } else if (stateCode == OH_SCREEN_CAPTURE_STATE_CANCELED) {
-            std::cout << "Screen capture state: CANCELED" << std::endl;
+            LOG_INFO("Server", "Screen capture state: CANCELED");
             is_capturing_ = false;
         } else {
-            std::cout << "Screen capture state code:" << stateCode << std::endl;
+            LOG_INFO("Server", "Screen capture state code:" + std::to_string(stateCode));
         }
     }
     
     void handleBufferAvailable(OH_AVScreenCapture* capture, OH_AVBuffer* buffer, 
                               OH_AVScreenCaptureBufferType bufferType, int64_t timestamp) {
-        std::cout << "Enter handleBufferAvailable" << std::endl;
-        // 使用Surface模式，这个回调主要用于音频数据处理
-        // 对于视频数据，通过Surface直接传递给编码器
+        LOG_INFO("Server", "Enter handleBufferAvailable");
         if (!is_capturing_) {
             return;
         }
@@ -1382,7 +1362,7 @@ public:
         port_ = args.port;
         
         if (!initialize(args)) {
-            std::cerr << "OHScrcpyServer initialize fail" << std::endl;
+            LOG_ERROR("Server", "OHScrcpyServer initialize fail");
             return false;
         }
         
@@ -1392,7 +1372,7 @@ public:
     }
     
     void stop() {
-        std::cout << "Stopping OHScrcpy Server..." << std::endl;
+        LOG_INFO("Server", "Stopping OHScrcpy Server...");
         g_running = false;
         g_streaming = false;
         cleanup();
@@ -1416,8 +1396,7 @@ public:
         if ((width == screen_info_.width) && (height == screen_info_.height)) {
             return;
         }
-        std::cout << "Resolution is changed, reset video output: displayId[" << displayId << "] resolution["
-            << width << "x" << height << "]" << std::endl;
+        LOG_INFO("Server", "Resolution is changed, reset video output: displayId[" + std::to_string(displayId) + "] resolution[" + std::to_string(width) + "x" + std::to_string(height) + "]");
         stopStreaming();
         screen_info_.width = width;
         screen_info_.height = height;
@@ -1456,16 +1435,16 @@ public:
     
     // H.265编码器存在性检测（不检测具体分辨率）
     bool checkHevcEncoderExists() {
-        std::cout << "[Step 1] Check H.265 hardware encoder existence" << std::endl;
+        LOG_INFO("Server", "[Step 1] Check H.265 hardware encoder existence");
         OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(
             OH_AVCODEC_MIMETYPE_VIDEO_HEVC, true, HARDWARE);
         
         if (capability == nullptr) {
-            std::cout << "  H.265 hardware encoder NOT supported" << std::endl;
+            LOG_INFO("Server", "  H.265 hardware encoder NOT supported");
             return false;
         }
         
-        std::cout << "  H.265 hardware encoder supported" << std::endl;
+        LOG_INFO("Server", "  H.265 hardware encoder supported");
         return true;
     }
     
@@ -1479,9 +1458,9 @@ public:
         bool supported = OH_AVCapability_AreVideoSizeAndFrameRateSupported(capability, width, height, fps);
         
         if (supported) {
-            std::cout << "  H.265 supports " << width << "x" << height << "@" << fps << "fps" << std::endl;
+            LOG_INFO("Server", "  H.265 supports " + std::to_string(width) + "x" + std::to_string(height) + "@" + std::to_string(fps) + "fps");
         } else {
-            std::cout << "  H.265 does NOT support " << width << "x" << height << "@" << fps << "fps" << std::endl;
+            LOG_INFO("Server", "  H.265 does NOT support " + std::to_string(width) + "x" + std::to_string(height) + "@" + std::to_string(fps) + "fps");
         }
         
         return supported;
@@ -1497,9 +1476,9 @@ public:
         bool supported = OH_AVCapability_AreVideoSizeAndFrameRateSupported(capability, width, height, fps);
         
         if (supported) {
-            std::cout << "  H.264 supports " << width << "x" << height << "@" << fps << "fps" << std::endl;
+            LOG_INFO("Server", "  H.264 supports " + std::to_string(width) + "x" + std::to_string(height) + "@" + std::to_string(fps) + "fps");
         } else {
-            std::cout << "  H.264 does NOT support " << width << "x" << height << "@" << fps << "fps" << std::endl;
+            LOG_INFO("Server", "  H.264 does NOT support " + std::to_string(width) + "x" + std::to_string(height) + "@" + std::to_string(fps) + "fps");
         }
         
         return supported;
@@ -1524,8 +1503,7 @@ public:
         const std::vector<StandardResolution>& resolutions = 
             isHorizontal ? HORIZONTAL_RESOLUTIONS : VERTICAL_RESOLUTIONS;
         
-        std::cout << "  Searching " << codec << " supported resolutions (direction: " 
-                  << (isHorizontal ? "horizontal" : "vertical") << ")..." << std::endl;
+        LOG_INFO("Server", "  Searching " + codec + " supported resolutions (direction: " + (isHorizontal ? "horizontal" : "vertical") + ")...");
         
         std::vector<StandardResolution> candidates;
         for (const auto& res : resolutions) {
@@ -1538,15 +1516,15 @@ public:
             
             if (supported) {
                 candidates.push_back(res);
-                std::cout << "    " << res.name << " (" << res.width << "x" << res.height << ") - PASSED" << std::endl;
+                LOG_INFO("Server", "    " + res.name + " (" + std::to_string(res.width) + "x" + std::to_string(res.height) + ") - PASSED");
             } else {
-                std::cout << "    " << res.name << " (" << res.width << "x" << res.height << ") - NOT supported" << std::endl;
+                LOG_INFO("Server", "    " + res.name + " (" + std::to_string(res.width) + "x" + std::to_string(res.height) + ") - NOT supported");
             }
         }
         
         if (candidates.empty()) {
-            std::cout << "  No " << codec << " supported resolution found!" << std::endl;
-            return {0, 0, "none", 0};  // 表示未找到
+            LOG_INFO("Server", "  No " + codec + " supported resolution found!");
+            return {0, 0, "none", 0};
         }
         
         // 找像素数最接近原始的
@@ -1560,8 +1538,7 @@ public:
             }
         }
         
-        std::cout << "  Best " << codec << " match: " << best.name 
-                  << " (" << best.width << "x" << best.height << ")" << std::endl;
+        LOG_INFO("Server", "  Best " + codec + " match: " + best.name + " (" + std::to_string(best.width) + "x" + std::to_string(best.height) + ")");
         
         return best;
     }
@@ -1606,72 +1583,66 @@ void applyCodecConfig(ScreenInfo& screenInfo, const StandardResolution& res,
         bool hasHevc = checkHevcEncoderExists();
         
         if (hasHevc) {
-            std::cout << "[Step 2] Check if H.265 supports original resolution" << std::endl;
+            LOG_INFO("Server", "[Step 2] Check if H.265 supports original resolution");
             if (checkHevcSizeAndFrameRateSupported(origWidth, origHeight, origFps)) {
-                std::cout << "  H.265 supports original resolution, using H.265 directly" << std::endl;
+                LOG_INFO("Server", "  H.265 supports original resolution, using H.265 directly");
                 screenInfo.codec = "h265";
                 return true;
             }
             
-            std::cout << "[Step 3] Find H.265 supported resolution from standard list" << std::endl;
+            LOG_INFO("Server", "[Step 3] Find H.265 supported resolution from standard list");
             StandardResolution hevcRes = findCodecSupportedResolution("h265", origWidth, origHeight, origFps);
             if (hevcRes.name != "none") {
-                std::cout << "  Found H.265 supported resolution, using H.265" << std::endl;
+                LOG_INFO("Server", "  Found H.265 supported resolution, using H.265");
                 applyCodecConfig(screenInfo, hevcRes, origBitrate, origWidth, origHeight, "h265");
                 return true;
             }
             
-            std::cout << "[Step 4] No H.265 resolution found, fallback to H.264" << std::endl;
+            LOG_INFO("Server", "[Step 4] No H.265 resolution found, fallback to H.264");
         } else {
-            std::cout << "[Step 2] No H.265 encoder, using H.264" << std::endl;
+            LOG_INFO("Server", "[Step 2] No H.265 encoder, using H.264");
         }
         
         StandardResolution avcRes = findCodecSupportedResolution("h264", origWidth, origHeight, origFps);
         if (avcRes.name != "none") {
-            std::cout << "  Found H.264 supported resolution, using H.264" << std::endl;
+            LOG_INFO("Server", "  Found H.264 supported resolution, using H.264");
             applyCodecConfig(screenInfo, avcRes, origBitrate, origWidth, origHeight, "h264");
             return true;
         }
         
-        std::cout << "  No codec supports any standard resolution! Forcing default 720x1280 H.264" << std::endl;
+        LOG_INFO("Server", "  No codec supports any standard resolution! Forcing default 720x1280 H.264");
         applyDefaultConfig(screenInfo);
         return true;
     }
     
 private:
     bool initialize(const CommandLineArgs& args) {
-        std::cout << "Initializing modules..." << std::endl;
-        // 1. 初始化网络模块
+        LOG_INFO("Server", "Initializing modules...");
         if (!network_.initialize(port_)) {
-            std::cerr << "Initialize network module fail" << std::endl;
+            LOG_ERROR("Server", "Initialize network module fail");
             return false;
         }
 
-        // 2. 获取屏幕信息（原始分辨率）
         ScreenInfo screenInfo;
         if (!getPrimaryScreenInfo(screenInfo)) {
-            std::cerr << "Get primary screen info fail" << std::endl;
+            LOG_ERROR("Server", "Get primary screen info fail");
             return false;
         }
         
-		// 3. 自动选择最优codec
-        selectCodecAndResolution(screenInfo, screenInfo.width, screenInfo.height,
+		selectCodecAndResolution(screenInfo, screenInfo.width, screenInfo.height,
                                  screenInfo.fps, screenInfo.bitrate);
 
-        // 4. 设置最终配置
         screen_info_ = screenInfo;
-        std::cout << "------------------------------------------------------" << std::endl;
-        std::cout << "Final config: " << screen_info_.width << "x" << screen_info_.height 
-                  << "@" << screen_info_.fps << "fps, codec=" << screen_info_.codec 
-                  << ", bitrate=" << screen_info_.bitrate << "bps" << std::endl;
-		std::cout << "------------------------------------------------------" << std::endl;
+        LOG_INFO("Server", "------------------------------------------------------");
+        LOG_INFO("Server", "Final config: " + std::to_string(screen_info_.width) + "x" + std::to_string(screen_info_.height) + "@" + std::to_string(screen_info_.fps) + "fps, codec=" + screen_info_.codec + ", bitrate=" + std::to_string(screen_info_.bitrate) + "bps");
+		LOG_INFO("Server", "------------------------------------------------------");
         return true;
     }
 
     bool getPrimaryScreenInfo(ScreenInfo &info) {
         auto display = DisplayManager::GetInstance().GetDefaultDisplay();
         if (display == nullptr) {
-            std::cerr << "DisplayManager::GetDefaultDisplay fail" << std::endl;
+            LOG_ERROR("Server", "DisplayManager::GetDefaultDisplay fail");
             return false;
         }
         
@@ -1687,100 +1658,96 @@ private:
     void printScreenDetailsInfo() {
         auto display = DisplayManager::GetInstance().GetDefaultDisplay();
         if (display == nullptr) {
-            std::cerr << "DisplayManager::GetDefaultDisplay fail" << std::endl;
+            LOG_ERROR("Server", "DisplayManager::GetDefaultDisplay fail");
             return;
         }
 
-        std::cout << "------------------------------------------------------" << std::endl;
-        std::cout << "PrimaryDisplayDetailsInfo: " << std::endl;
-        std::cout << "  id: " << display->GetId() << ", name: " << display->GetName() << std::endl;
-        std::cout << "  width: " << display->GetWidth() << ", height: " << display->GetHeight() << std::endl;
-        std::cout << "  phyWidth: " << display->GetPhysicalWidth() << ", phyHeight: " << display->GetPhysicalHeight() << std::endl;
-        std::cout << "  refreshRate: " << display->GetRefreshRate() << ", rotation: " << static_cast<int32_t>(display->GetRotation()) << std::endl;
+        LOG_INFO("Server", "------------------------------------------------------");
+        LOG_INFO("Server", "PrimaryDisplayDetailsInfo: ");
+        LOG_INFO("Server", "  id: " + std::to_string(display->GetId()) + ", name: " + std::string(display->GetName()));
+        LOG_INFO("Server", "  width: " + std::to_string(display->GetWidth()) + ", height: " + std::to_string(display->GetHeight()));
+        LOG_INFO("Server", "  phyWidth: " + std::to_string(display->GetPhysicalWidth()) + ", phyHeight: " + std::to_string(display->GetPhysicalHeight()));
+        LOG_INFO("Server", "  refreshRate: " + std::to_string(display->GetRefreshRate()) + ", rotation: " + std::to_string(static_cast<int32_t>(display->GetRotation())));
         
         std::vector<uint32_t> hdrFormats;
         display->GetSupportedHDRFormats(hdrFormats);
-        std::cout << "  HDRFormats: [";
+        std::string hdrStr = "  HDRFormats: [";
         for (uint32_t i = 0; i < hdrFormats.size(); ++i) {
-            std::cout << hdrFormats[i];
-            if (i < hdrFormats.size() - 1) std::cout << ", ";
+            hdrStr += std::to_string(hdrFormats[i]);
+            if (i < hdrFormats.size() - 1) hdrStr += ", ";
         }
-        std::cout << "]" << std::endl;
+        hdrStr += "]";
+        LOG_INFO("Server", hdrStr);
 
         std::vector<uint32_t> colorSpaces;
         display->GetSupportedColorSpaces(colorSpaces);
-        std::cout << "  ColorSpaces: [";
+        std::string colorStr = "  ColorSpaces: [";
         for (uint32_t i = 0; i < colorSpaces.size(); ++i) {
-            std::cout << colorSpaces[i];
-            if (i < colorSpaces.size() - 1) std::cout << ", ";
+            colorStr += std::to_string(colorSpaces[i]);
+            if (i < colorSpaces.size() - 1) colorStr += ", ";
         }
-        std::cout << "]" << std::endl;
-        std::cout << "------------------------------------------------------" << std::endl;
+        colorStr += "]";
+        LOG_INFO("Server", colorStr);
+        LOG_INFO("Server", "------------------------------------------------------");
     }
     
     bool initStreaming() {
-        std::cout << "Initializing streaming modules (encoder & capturer)..." << std::endl;
+        LOG_INFO("Server", "Initializing streaming modules (encoder & capturer)...");
         
-        // 1. 初始化视频编码器
         if (!encoder_.initialize(screen_info_, &network_)) {
-            std::cerr << "Initialize video encoder fail" << std::endl;
+            LOG_ERROR("Server", "Initialize video encoder fail");
             return false;
         }
 
-        // 2. 初始化屏幕捕获器
         if (!capturer_.initialize(screen_info_, &encoder_, &network_)) {
-            std::cerr << "Initialize screen capturer fail" << std::endl;
+            LOG_ERROR("Server", "Initialize screen capturer fail");
             encoder_.release();
             return false;
         }
 
-        // 3. 开始编码
         if (!encoder_.start()) {
-            std::cerr << "Failed to start video encoder" << std::endl;
+            LOG_ERROR("Server", "Failed to start video encoder");
             capturer_.release();
             encoder_.release();
             return false;
         }
         
-        // 4. 开始捕获
         if (!capturer_.start()) {
-            std::cerr << "Failed to start screen capture" << std::endl;
+            LOG_ERROR("Server", "Failed to start screen capture");
             encoder_.stop();
             capturer_.release();
             encoder_.release();
             return false;
         }
         
-        // 5. 注册显示变化监听
         DisplayManager::GetInstance().RegisterDisplayListener(display_listener_);
 
-        std::cout << "Initialize streaming modules successfully" << std::endl;
+        LOG_INFO("Server", "Initialize streaming modules successfully");
         return true;
     }
     
     void stopStreaming(bool exit = false) {
-        std::cout << "Stopping streaming modules..." << std::endl;
+        LOG_INFO("Server", "Stopping streaming modules...");
         g_streaming = false;
         DisplayManager::GetInstance().UnregisterDisplayListener(display_listener_);
         capturer_.stop();
         encoder_.stop();
         capturer_.release();
         encoder_.release();
-        std::cout << "Stop streaming modules complete" << std::endl;
-        std::cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
+        LOG_INFO("Server", "Stop streaming modules complete");
+        LOG_INFO("Server", "++++++++++++++++++++++++++++++++++++++++++++++++++++++");
         if (!exit) {
-            std::cout << std::endl << "Waiting for client connection..." << std::endl;
+            LOG_INFO("Server", "Waiting for client connection...");
         }
     }
     
     void mainLoop() {
-        std::cout << "Entering main loop..." << std::endl;
-        std::cout << "Waiting for client connection..." << std::endl;
+        LOG_INFO("Server", "Entering main loop...");
+        LOG_INFO("Server", "Waiting for client connection...");
         auto last_stat_time = std::chrono::steady_clock::now();
         auto last_heartbeat_time = std::chrono::steady_clock::now();
         auto last_connection_check = std::chrono::steady_clock::now();
         
-        // 用于跟踪是否已完成初始握手的标志
         bool handshake_completed = false;
         
         while (g_running) {
@@ -1796,7 +1763,7 @@ private:
             if (std::chrono::duration_cast<std::chrono::seconds>(now - last_connection_check).count() >= 1) {
                 if (!network_.checkConnection()) {
                     if (handshake_completed || g_streaming) {
-                        std::cout << "Client disconnected, stopping streaming..." << std::endl;
+                        LOG_INFO("Server", "Client disconnected, stopping streaming...");
                         stopStreaming();
                         handshake_completed = false;
                     }
@@ -1813,65 +1780,60 @@ private:
             
             // 4. 未完成握手，则执行握手流程
             if (!handshake_completed) {
-                std::cout << "Starting handshake with client..." << std::endl;
+                LOG_INFO("Server", "Starting handshake with client...");
                 
-                // 4.1 发送配置信息
                 if (!network_.sendConfig(screen_info_)) {
-                    std::cerr << "SendConfig to client fail, disconnected." << std::endl;
+                    LOG_ERROR("Server", "SendConfig to client fail, disconnected.");
                     network_.disconnectClient();
                     handshake_completed = false;
                     continue;
                 }
-                std::cout << "SendConfig to client complete, waiting for client's ACK..." << std::endl;
+                LOG_INFO("Server", "SendConfig to client complete, waiting for client's ACK...");
                 
-                // 4.2 等待客户端确认 (CONFIG_ACK)
                 if (!network_.receiveAck(5000)) {
-                    std::cerr << "Waiting client config ACK timeout, disconnected." << std::endl;
+                    LOG_ERROR("Server", "Waiting client config ACK timeout, disconnected.");
                     network_.disconnectClient();
                     handshake_completed = false;
                     continue;
                 }
-                std::cout << "Received config ACK from client, handshake successful." << std::endl;
+                LOG_INFO("Server", "Received config ACK from client, handshake successful.");
                 handshake_completed = true;
                 
-                // 4.3 握手成功后，立即尝试初始化流媒体模块
                 if (!initStreaming()) {
-                    std::cerr << "initStreaming fail, disconnected." << std::endl;
+                    LOG_ERROR("Server", "initStreaming fail, disconnected.");
                     stopStreaming();
                     network_.disconnectClient();
                     handshake_completed = false;
                     continue;
                 }
                 
-                // 流媒体初始化成功
                 g_streaming = true;
-                std::cout << "Streaming pipeline initialized successfully, starting transmission." << std::endl;
+                LOG_INFO("Server", "Streaming pipeline initialized successfully, starting transmission.");
             }
             
             // 5. 握手完成且流已初始化，进入正常数据传输
             if (handshake_completed && g_streaming) {
-                // 定期打印统计信息
                 static uint64_t last_frame_count = 0;
                 uint64_t frame_count = encoder_.getFrameCount();
                 now = std::chrono::steady_clock::now();
                 auto stat_elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_stat_time);
                 if ((stat_elapsed.count() >= 5) && (last_frame_count != frame_count)) {
-                    std::cout << "Streaming active, frames sent: " << frame_count << std::endl;
+                    LOG_INFO("Server", "Streaming active, frames sent: " + std::to_string(frame_count));
                     last_stat_time = now;
                     last_frame_count = frame_count;
                 }
             }
 
-            usleep(10000); // 10ms
+            usleep(10000);
         }
-        std::cout << "Exiting main loop..." << std::endl;
+        LOG_INFO("Server", "Exiting main loop...");
     }
     
     void cleanup() {
-        std::cout << "Cleaning up resources..." << std::endl;
+        LOG_INFO("Server", "Cleaning up resources...");
         stopStreaming(true);
         network_.closeAll();
-        std::cout << "Cleanup completed" << std::endl;
+        LOG_INFO("Server", "Cleanup completed");
     }
     
 private:
@@ -1889,7 +1851,7 @@ void DisplayResolutionListener::OnChange(DisplayId displayId) {
     }
     auto display = DisplayManager::GetInstance().GetDisplayById(displayId);
     if (display == nullptr) {
-        std::cerr << "DisplayManager::GetDisplayById fail" << std::endl;
+        LOG_ERROR("Server", "DisplayManager::GetDisplayById fail");
         return;
     }
     
@@ -1900,31 +1862,33 @@ void DisplayResolutionListener::OnChange(DisplayId displayId) {
 
 // 打印使用帮助
 void print_usage(const char* program_name) {
-    std::cout << "Usage: " << program_name << " [OPTIONS]" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Options:" << std::endl;
-    std::cout << "  -p, --port PORT         Specify the port to listen on (default: " << DEFAULT_PORT << ")" << std::endl;
-    std::cout << "  -w, --width WIDTH       Screen width in pixels (default: " << DEFAULT_WIDTH << ")" << std::endl;
-    std::cout << "  -h, --height HEIGHT     Screen height in pixels (default: " << DEFAULT_HEIGHT << ")" << std::endl;
-    std::cout << "  -f, --framerate FPS     Frame rate in frames per second (default: " << DEFAULT_FPS << ")" << std::endl;
-    std::cout << "  -b, --bitrate BITRATE   Video bitrate in bits per second (default: " << DEFAULT_BITRATE << ")" << std::endl;
-    std::cout << "  -V, --version           Show version information" << std::endl;
-    std::cout << "  -H, --help              Show this help message" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Examples:" << std::endl;
-    std::cout << "  " << program_name << "                         # Use default settings on port " << DEFAULT_PORT << std::endl;
-    std::cout << "  " << program_name << " -p 27184                # Listen on port 27184" << std::endl;
-    std::cout << "  " << program_name << " -w 720 -h 1280          # Set resolution to 720x1280" << std::endl;
-    std::cout << "  " << program_name << " -f 60 -b 8000000        # 60 fps, 8 Mbps bitrate" << std::endl;
-    std::cout << "  " << program_name << " -w 720 -h 1280 -f 30    # 720x1280@30fps" << std::endl;
-    std::cout << std::endl;
+    LOG_INFO("Server", "Usage: " + std::string(program_name) + " [OPTIONS]");
+    LOG_INFO("Server", "");
+    LOG_INFO("Server", "Options:");
+    LOG_INFO("Server", "  -p, --port PORT         Specify the port to listen on (default: " + std::to_string(DEFAULT_PORT) + ")");
+    LOG_INFO("Server", "  -w, --width WIDTH       Screen width in pixels (default: " + std::to_string(DEFAULT_WIDTH) + ")");
+    LOG_INFO("Server", "  -h, --height HEIGHT     Screen height in pixels (default: " + std::to_string(DEFAULT_HEIGHT) + ")");
+    LOG_INFO("Server", "  -f, --framerate FPS     Frame rate in frames per second (default: " + std::to_string(DEFAULT_FPS) + ")");
+    LOG_INFO("Server", "  -b, --bitrate BITRATE   Video bitrate in bits per second (default: " + std::to_string(DEFAULT_BITRATE) + ")");
+    LOG_INFO("Server", "  -l, --log               Enable logging to /data/local/tmp/");
+    LOG_INFO("Server", "  -V, --version           Show version information");
+    LOG_INFO("Server", "  -H, --help              Show this help message");
+    LOG_INFO("Server", "");
+    LOG_INFO("Server", "Examples:");
+    LOG_INFO("Server", "  " + std::string(program_name) + "                         # Use default settings on port " + std::to_string(DEFAULT_PORT));
+    LOG_INFO("Server", "  " + std::string(program_name) + " -p 27184                # Listen on port 27184");
+    LOG_INFO("Server", "  " + std::string(program_name) + " -w 720 -h 1280          # Set resolution to 720x1280");
+    LOG_INFO("Server", "  " + std::string(program_name) + " -f 60 -b 8000000        # 60 fps, 8 Mbps bitrate");
+    LOG_INFO("Server", "  " + std::string(program_name) + " -w 720 -h 1280 -f 30    # 720x1280@30fps");
+    LOG_INFO("Server", "  " + std::string(program_name) + " -l                     # Enable logging");
+    LOG_INFO("Server", "");
 }
 
 // 打印版本信息
 void print_version() {
-    std::cout << "====================================================================" << std::endl;
-    std::cout << "        OpenHarmony_Scrcpy Server - " << VERSION << " (author: luodh0157)        " << std::endl;
-    std::cout << "====================================================================" << std::endl;
+    LOG_INFO("Server", "====================================================================");
+    LOG_INFO("Server", "        OpenHarmony_Scrcpy Server - " + std::string(VERSION) + " (author: luodh0157)        ");
+    LOG_INFO("Server", "====================================================================");
 }
 
 // 解析命令行参数
@@ -1936,6 +1900,7 @@ void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
         {"height", required_argument, 0, 'h'},
         {"framerate", required_argument, 0, 'f'},
         {"bitrate", required_argument, 0, 'b'},
+        {"log", no_argument, 0, 'l'},
         {"version", no_argument, 0, 'V'},
         {"help", no_argument, 0, 'H'},
         {0, 0, 0, 0}
@@ -1945,12 +1910,12 @@ void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
     int option_index = 0;
     int param = 0;
     
-    while ((opt = getopt_long(argc, argv, "p:w:h:f:b:V:H:?", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "p:w:h:f:b:lV:H:?", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'p':
                 param = std::atoi(optarg);
                 if (param <= 0 || param > 65535) {
-                    std::cerr << "Invalid port: " << optarg << ", use default " << args.port << std::endl;
+                    LOG_ERROR("Server", "Invalid port: " + std::string(optarg) + ", use default " + std::to_string(args.port));
                 } else {
                     args.port = param;
                 }
@@ -1959,7 +1924,7 @@ void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
             case 'w':
                 param = std::atoi(optarg);
                 if (param <= 0) {
-                    std::cerr << "Invalid width: " << optarg << ", use actual " << args.width << std::endl;
+                    LOG_ERROR("Server", "Invalid width: " + std::string(optarg) + ", use actual " + std::to_string(args.width));
                 } else {
                     args.width = param;
                 }
@@ -1968,7 +1933,7 @@ void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
             case 'h':
                 param = std::atoi(optarg);
                 if (param <= 0) {
-                    std::cerr << "Invalid height: " << optarg << ", use actual " << args.height << std::endl;
+                    LOG_ERROR("Server", "Invalid height: " + std::string(optarg) + ", use actual " + std::to_string(args.height));
                 } else {
                     args.height = param;
                 }
@@ -1977,7 +1942,7 @@ void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
             case 'f':
                 param = std::atoi(optarg);
                 if (param <= 0) {
-                    std::cerr << "Invalid framerate: " << optarg << ", use actual " << args.framerate << std::endl;
+                    LOG_ERROR("Server", "Invalid framerate: " + std::string(optarg) + ", use actual " + std::to_string(args.framerate));
                 } else {
                     args.framerate = param;
                 }
@@ -1986,10 +1951,14 @@ void parse_arguments(int argc, char* argv[], CommandLineArgs& args) {
             case 'b':
                 param = std::atoi(optarg);
                 if (param <= 0) {
-                    std::cerr << "Invalid bitrate: " << optarg << ", use actual " << args.bitrate << std::endl;
+                    LOG_ERROR("Server", "Invalid bitrate: " + std::string(optarg) + ", use actual " + std::to_string(args.bitrate));
                 } else {
                     args.bitrate = param;
                 }
+                break;
+                
+            case 'l':
+                args.log_enabled = true;
                 break;
                 
             case 'V':
@@ -2020,6 +1989,19 @@ int main(int argc, char* argv[]) {
 
     // 解析命令行参数
     parse_arguments(argc, argv, args);
+    
+    if (args.log_enabled) {
+        auto now = std::chrono::system_clock::now();
+        auto time = std::chrono::system_clock::to_time_t(now);
+        pid_t pid = getpid();
+        std::stringstream ss;
+        ss << LOG_FILE_PREFIX << pid << "_" << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S") << ".log";
+        std::string log_path = ss.str();
+        Logger::Instance().SetLogFile(log_path);
+        Logger::Instance().EnableFile(true);
+        LOG_INFO("Server", "Log file enabled: " + log_path);
+    }
+    
     if (args.show_help) {
         print_usage(argv[0]);
         return 0;
@@ -2030,10 +2012,10 @@ int main(int argc, char* argv[]) {
     
     // 启动服务
     if (!server.start(args)) {
-        std::cerr << "Start OHScrcpy server fail" << std::endl;
+        LOG_ERROR("Server", "Start OHScrcpy server fail");
         return 1;
     }
     
-    std::cout << "OHScrcpy server exit" << std::endl;
+    LOG_INFO("Server", "OHScrcpy server exit");
     return 0;
 }

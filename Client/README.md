@@ -51,11 +51,11 @@
       - 确保设备和计算机在同一局域网（有线/无线）或者用网线将设备和计算机直连
 
 ### 2. 启动客户端GUI程序
-- **前置条件**：将`ohscrcpy_client.py`、`hdc`目录、`Server\bin\rk3568`目录下的`ohscrcpy_client`、`Server\`目录下的`ohscrcpy_client.cfg`拷贝到本地同一目录；如果是HarmonyOS设备，在本地目录下新建一个名为`HUAWEI`的目录，然后将`Server\bin\harmonyos`目录下的`ohscrcpy_client`拷贝到本地`HUAWEI`目录下的。
+- **前置条件**：本地新建一个目录`OpenHarmony_Scrcpy`，将`Client`目录下的所有目录+文件、`hdc`目录、`Server\bin\rk3568`目录下的`ohscrcpy_server`、`Server\`目录下的`ohscrcpy_server.cfg`拷贝到本地`OpenHarmony_Scrcpy`目录；如果是HarmonyOS设备，在本地`OpenHarmony_Scrcpy`目录下新建一个名为`HUAWEI`的目录，然后将`Server\bin\harmonyos`目录下的`ohscrcpy_server`拷贝到本地`HUAWEI`目录下的。
 
 - 系统控制台（命令行环境）启动客户端
 ```bash
-python ohscrcpy_client.py
+python main.py
 ```
    1. 运行程序后，主界面将显示
    2. 点击`刷新`按钮扫描可用设备
@@ -102,6 +102,71 @@ python ohscrcpy_client.py
 - **默认端口**：27183
 - **心跳间隔**：1秒
 - **心跳超时**：5秒
+
+## 日志系统
+
+### 客户端日志配置
+- **配置文件**：`config/log_config.json`
+- **默认启用**：`log_to_file=true`（自动记录日志到文件）
+- **日志位置**：`logs/client_YYYYMMDD_HHMMSS.log`（根目录下logs子目录）
+- **双输出模式**：控制台输出（简化格式）+ 文件记录（完整格式）
+
+**配置文件字段说明**：
+```json
+{
+  "log_level": "INFO",         // 日志级别：DEBUG/INFO/WARN/ERROR/FATAL
+  "log_to_file": true,         // 是否启用日志文件记录
+  "log_dir": "logs",           // 日志目录（相对于可执行文件所在目录）
+  "log_file": null,            // 日志文件名（null表示自动生成）
+  "max_log_size_mb": 10,       // 最大日志文件大小（MB）
+  "backup_count": 5            // 备份日志文件数量
+}
+```
+
+### 服务端日志拉取
+
+服务端日志位于设备端`/data/local/tmp/`目录，可通过日志管理脚本拉取到本地。
+
+#### 获取服务端PID
+客户端启动服务端后会自动输出PID：
+```
+[INFO][服务端管理器] 服务正在运行，PID: 12345
+```
+
+#### 拉取日志命令
+
+**Linux/Mac**：
+```bash
+./fetch_fetch_and_delete_server_logs.sh 12345  # 精确拉取
+./fetch_fetch_and_delete_server_logs.sh        # 批量拉取
+```
+
+**Windows**：
+```cmd
+fetch_fetch_and_delete_server_logs.bat 12345   # 精确拉取
+fetch_fetch_and_delete_server_logs.bat         # 批量拉取
+```
+
+**说明**：
+- 拉取后日志保存在本地`logs/`目录
+- 不删除设备上的日志文件
+- 脚本优先使用内置hdc，其次使用系统PATH中的hdc
+
+### 日志清理
+
+**Linux/Mac**：
+```bash
+./delete_fetch_and_delete_server_logs.sh 12345  # 精确删除（无需确认）
+./delete_fetch_and_delete_server_logs.sh        # 批量删除（需确认）
+```
+
+**Windows**：
+```cmd
+delete_fetch_and_delete_server_logs.bat 12345   # 精确删除（无需确认）
+delete_fetch_and_delete_server_logs.bat         # 批量删除（需确认）
+```
+
+**注意**：删除前请确保服务端进程已停止。
 
 ## 故障排除
 

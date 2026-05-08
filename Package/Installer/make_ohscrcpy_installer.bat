@@ -18,12 +18,12 @@ REM limitations under the License.
 
 title OpenHarmony OHScrcpy 安装程序制作脚本
 color 0a
-echo ===========================================================
-echo     OpenHarmony OHScrcpy 安装程序制作脚本（Windows平台）
-echo ===========================================================
+echo ============================================================
+echo     OpenHarmony OHScrcpy 安装程序制作脚本（Windows平台）    
+echo ============================================================
 echo.
 
-set VERSION="v2.0.0"
+set VERSION="v2.1.0"
 
 ::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
 if defined PROCESSOR_ARCHITEW6432 (
@@ -82,7 +82,7 @@ if not exist ohscrcpy_setup.iss (
 
 if not exist dist\OHScrcpy\OHScrcpy.exe (
     echo [错误] 未找到OHScrcpy.exe程序文件
-    echo 请先运行 package_ohscrcpy.bat 进行打包
+    echo 请先运行 make_ohscrcpy_executer_onedir.bat 进行打包
     pause
     exit /b 1
 )

@@ -35,29 +35,48 @@
 ### 项目结构
 ```
 OpenHarmony_Scrcpy/
-├── Client/              # 客户端目录
-├──── hdc/               # 各平台hdc工具
-├──── ohscrcpy_client.py # 客户端程序入口
-├──── README.md          # 客户端说明文档
-├── Package               # 打包工具
-├──── Executer/           # 自解压打包工具
-├──── Installer/          # 安装包打包工具
-├──── 打包工具使用说明.md # 打包使用说明
+├── Client/                       # 客户端目录
+│   ├── core/                     # 核心模块
+│   ├── video/                    # 视频模块
+│   ├── gui/                      # GUI模块
+│   ├── utils/                    # 工具模块
+│   ├── config/                   # 配置目录
+│   ├── hdc/                      # 各平台HDC工具
+│   ├── main.py                   # 程序入口
+│   └── README.md                 # 客户端说明文档
 ├── Server/                       # 服务端目录
-├──── bin/                        # 预置二进制可执行文件目录
-├──── BUILD.gn                    # 服务端在OpenHarmony系统下的编译配置脚本
-├──── build_ohscrcpy_server.sh    # 服务端编译脚本
-├──── install_ohscrcpy_server.bat # 服务端安装脚本（Windows）
-├──── install_ohscrcpy_server.sh  # 服务端安装脚本（Linux）
-├──── ohscrcpy_server.cfg         # 服务端在OpenHarmony系统下的运行权限配置
-├──── ohscrcpy_server.cpp         # 服务端实现源码
-├──── ohscrcpy_server.patch       # 服务端嵌入编译配置补丁
-├──── README.md                   # 服务端说明文档
-├──── start_ohscrcpy_server.bat   # 服务端启动脚本（Windows）
-├──── start_ohscrcpy_server.sh    # 服务端启动脚本（Linux）
-├── CHANGELOG.txt # 版本修改记录
-├── LICENSE       # LICENSE说明
-└── README.md     # 说明文档
+│   ├── include/                  # 头文件目录
+│   ├── src/                      # 源文件目录
+│   ├── bin/                      # 预置二进制可执行文件目录
+│   ├── BUILD.gn                  # OpenHarmony编译配置脚本
+│   ├── build_ohscrcpy_server.sh  # 服务端编译脚本
+│   ├── install_ohscrcpy_server.bat # 服务端安装脚本（Windows）
+│   ├── install_ohscrcpy_server.sh  # 服务端安装脚本（Linux）
+│   ├── ohscrcpy_server.cfg       # 运行权限配置
+│   ├── ohscrcpy_server.patch     # 嵌入编译配置补丁
+│   ├── README.md                 # 服务端说明文档
+│   ├── start_ohscrcpy_server.bat # 服务端启动脚本（Windows）
+│   └── start_ohscrcpy_server.sh  # 服务端启动脚本（Linux）
+├── Package/                      # 打包工具
+│   ├── Executer/                 # 自解压打包工具
+│   ├── Installer/                # 安装包打包工具
+│   └── 打包工具使用说明.md        # 打包使用说明
+├── tests/                        # 测试目录
+│   ├── conftest.py               # pytest配置
+│   ├── fixtures/                 # 测试数据目录
+│   ├── requirements-test.txt     # 测试依赖
+│   ├── run_tests.sh              # Linux/Mac测试脚本
+│   ├── run_tests.bat             # Windows测试脚本
+│   ├── test_hdc_executor.py      # HDC执行器测试
+│   ├── test_device_manager.py    # 设备管理器测试
+│   ├── test_decoder.py           # H264/H265解码器测试
+│   ├── test_fixtures.py          # fixtures验证测试
+│   ├── test_protocol.py          # 协议解析测试
+│   ├── test_server_manager.py    # 服务端管理器测试
+│   └── test_stream_client.py     # 视频流客户端测试
+├── CHANGELOG.txt                 # 版本修改记录
+├── LICENSE                       # LICENSE说明
+└── README.md                     # 说明文档
 ```
 
 ### 核心模块
@@ -90,15 +109,56 @@ OpenHarmony_Scrcpy/
    repo sync -c --no-tags -j`nproc`
    ```
    2. 在`foundation/multimedia/player_framework/`目录下新建`OHScrcpy_Server`目录
-   3. 将本项目`Server`目录中的`BUILD.gn`、`ohscrcpy_server.cpp`、`ohscrcpy_server.cfg`拷贝至上一步新建的`OHScrcpy_Server`目录下
+   3. 将本项目`Server`目录中的`BUILD.gn`、`include/`、`src/`、`ohscrcpy_server.cfg`拷贝至上一步新建的`OHScrcpy_Server`目录下
    4. 将本项目`Server`目录中的`ohscrcpy_server.patch`拷贝至`foundation/multimedia/player_framework/`目录下
    5. 在`foundation/multimedia/player_framework/`目录下执行`git apply ohscrcpy_server.patch`，打上编译配置补丁
    6. 在OpenHarmony全仓代码的根目录下，执行如下编译命令：
    ```bash
    ./build.sh --product-name rk3568 --build-target ohscrcpy_server
    ./build.sh --product-name rk3568 --build-target ohscrcpy_server --fast-rebuild （`--fast-rebuild`是快速编译参数，没有修改BUILD.gn和bundle.json时可用）
-   ```
-   7. 编译产物位于`out/rk3568/multimedia/player_framework/`目录下的`ohscrcpy_server`
+```
+    7. 编译产物位于`out/rk3568/multimedia/player_framework/`目录下的`ohscrcpy_server`
+
+### 测试
+
+#### 生成测试数据
+测试fixtures数据已自动生成，位于`tests/fixtures/`目录：
+- **H264测试数据**：`sample_sps_h264.bin`、`sample_pps_h264.bin`、`sample_frame_h264.bin`
+- **H265测试数据**：`sample_vps_h265.bin`、`sample_sps_h265.bin`、`sample_pps_h265.bin`、`sample_frame_h265.bin`
+- **其他数据**：`sample_config_packet.bin`、`sample_device_list.txt`
+
+如需重新生成测试数据：
+```bash
+cd tests/fixtures
+python generate_fixtures.py
+```
+
+#### 安装测试依赖
+```bash
+pip install -r tests/requirements-test.txt
+```
+
+#### 执行测试
+- **Linux/Mac**：
+  ```bash
+  cd tests
+  ./run_tests.sh
+  ```
+- **Windows**：
+  ```cmd
+  cd tests
+  run_tests.bat
+  ```
+#### 手动执行
+  ```bash
+  pytest tests/ -v
+  ```
+
+#### 测试说明
+- **test_fixtures.py**：验证测试数据文件正确性（9个测试）
+- **test_decoder.py**：使用fixtures数据测试H264/H265解码器
+- **test_protocol.py**：使用fixtures数据测试协议解析
+- **其他测试**：Mock测试设备管理、服务管理等功能
 
 ## 安装步骤
 
@@ -172,6 +232,88 @@ OpenHarmony_Scrcpy/
 - **默认端口**：27183
 - **心跳间隔**：1秒
 - **心跳超时**：5秒
+
+## 日志系统
+
+### 日志配置
+本项目内置完整的日志系统，方便问题排查和调试。
+
+#### 客户端日志
+- **配置文件**：`Client/config/log_config.json`
+- **默认启用**：`log_to_file=true`（自动记录日志到文件）
+- **日志位置**：`logs/client_YYYYMMDD_HHMMSS.log`（根目录下logs子目录）
+- **双输出**：控制台（简化格式）+ 文件（完整格式）
+
+#### 服务端日志
+- **启用方式**：客户端启动服务端时自动添加`--log`参数
+- **日志位置**：`/data/local/tmp/server_PID_YYYYMMDD_HHMMSS.log`
+- **命名规则**：包含PID，支持多客户端并发场景精确识别
+
+### 日志拉取
+
+服务端日志位于设备端`/data/local/tmp/`目录，可通过日志管理脚本拉取到本地。
+
+#### 步骤1：获取服务端PID
+客户端启动服务端后会自动输出PID：
+```
+[INFO][服务端管理器] 服务正在运行，PID: 12345
+```
+
+#### 步骤2：拉取日志
+
+**Linux/Mac平台**：
+```bash
+# 精确拉取（指定PID）
+./fetch_server_logs.sh 12345
+
+# 批量拉取（所有日志）
+./fetch_server_logs.sh
+```
+
+**Windows平台**：
+```cmd
+# 精确拉取（指定PID）
+fetch_server_logs.bat 12345
+
+# 批量拉取（所有日志）
+fetch_server_logs.bat
+```
+
+**说明**：
+- 拉取后日志保存在本地`logs/`目录
+- 不会删除设备上的日志文件（安全优先）
+- 脚本优先使用内置hdc工具，其次使用系统PATH中的hdc
+
+### 日志删除
+
+如需清理设备上的服务端日志：
+
+**Linux/Mac平台**：
+```bash
+# 精确删除（指定PID，无需确认）
+./delete_server_logs.sh 12345
+
+# 批量删除（所有日志，需确认）
+./delete_server_logs.sh
+```
+
+**Windows平台**：
+```cmd
+# 精确删除（指定PID，无需确认）
+delete_server_logs.bat 12345
+
+# 批量删除（所有日志，需确认）
+delete_server_logs.bat
+```
+
+**注意**：删除前请确保服务端进程已停止。
+
+### 日志管理脚本位置
+
+打包后的工具中，日志管理脚本位于根目录：
+- `fetch_server_logs.sh/bat` - 拉取日志
+- `delete_server_logs.sh/bat` - 删除日志
+- `fetch_and_delete_server_logs.sh/bat` - 二合一日志管理脚本
 
 ## 故障排除
 

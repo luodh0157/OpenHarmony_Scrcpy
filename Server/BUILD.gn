@@ -25,7 +25,13 @@ ohos_executable("ohscrcpy_server") {
   branch_protector_ret = "pac_ret"
 
   sources = [
-    "ohscrcpy_server.cpp",
+    "src/ohscrcpy_server.cpp",
+    "src/codec_wrapper.cpp",
+    "src/capture_wrapper.cpp",
+  ]
+  
+  include_dirs = [
+    "include",
   ]
   
   deps = [
