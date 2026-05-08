@@ -51,7 +51,11 @@
       - 确保设备和计算机在同一局域网（有线/无线）或者用网线将设备和计算机直连
 
 ### 2. 启动客户端GUI程序
+<<<<<<< HEAD
 - **前置条件**：本地新建一个目录`OpenHarmony_Scrcpy`，将`Client`目录下的`所有目录` 和 `main.py`、`Server\bin\rk3568`目录下的`ohscrcpy_server`、`Server\`目录下的`ohscrcpy_server.cfg`拷贝到本地`OpenHarmony_Scrcpy`目录；如果是HarmonyOS设备，还需要在本地`OpenHarmony_Scrcpy`目录下新建一个名为`HUAWEI`的目录，然后将`Server\bin\harmonyos`目录下的`ohscrcpy_server`拷贝到本地`HUAWEI`目录下的。
+=======
+- **前置条件**：本地新建一个目录`OpenHarmony_Scrcpy`，将`Client`目录下的所有目录+文件、`hdc`目录、`Server\bin\rk3568`目录下的`ohscrcpy_server`、`Server\`目录下的`ohscrcpy_server.cfg`拷贝到本地`OpenHarmony_Scrcpy`目录；如果是HarmonyOS设备，在本地`OpenHarmony_Scrcpy`目录下新建一个名为`HUAWEI`的目录，然后将`Server\bin\harmonyos`目录下的`ohscrcpy_server`拷贝到本地`HUAWEI`目录下的。
+>>>>>>> 28a404d3238af64d9d85746b6f41a2dcadd97338
 
 - 系统控制台（命令行环境）启动客户端
 ```bash

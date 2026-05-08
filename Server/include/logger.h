@@ -31,6 +31,17 @@ enum class LogLevel {
     FATAL = 4
 };
 
+/**
+ * Logger class for OHScrcpy Server
+ * 
+ * Features:
+ * - Log level filtering
+ * - Console output (simplified format)
+ * - File output (full format with date)
+ * - Send log to client via network
+ * - Thread-safe
+ * - Timestamp formatting
+ */
 class Logger {
 public:
     using SendLogCallback = std::function<void(const std::string& logLine)>;
@@ -76,6 +87,9 @@ private:
     std::mutex mutex_;
 };
 
+/**
+ * Convenient macros for logging
+ */
 #define LOG_DEBUG(tag, msg) OHScrcpy::Logger::Instance().Debug(tag, msg)
 #define LOG_INFO(tag, msg)  OHScrcpy::Logger::Instance().Info(tag, msg)
 #define LOG_WARN(tag, msg)  OHScrcpy::Logger::Instance().Warn(tag, msg)
