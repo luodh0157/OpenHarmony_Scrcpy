@@ -12,7 +12,7 @@ REM See the License for the specific language governing permissions and
 REM limitations under the License.
 
 REM ================================================================================
-REM        OpenHarmony OHScrcpy 自动清理资源脚本 - Installer打包方式 (Windows)
+REM       OpenHarmony OHScrcpy 自动清理资源脚本 - Installer打包方式 (Windows)
 REM ================================================================================
 REM
 REM 功能：自动清理从项目根目录拷贝的资源

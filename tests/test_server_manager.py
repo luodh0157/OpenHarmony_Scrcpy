@@ -58,39 +58,39 @@ class TestServerManager:
     
     def test_is_installed_true(self, server_manager, mock_hdc):
         """测试已安装状态"""
-        mock_hdc.execute.return_value = {"success": True, "output": "/data/local/tmp/ohscrcpy_server"}
-        result = server_manager.is_installed()
+        mock_hdc.check_file_exists = Mock(return_value=True)
+        result = server_manager.check_server_installed()
         assert result == True
-    
+
     def test_is_installed_false(self, server_manager, mock_hdc):
         """测试未安装状态"""
-        mock_hdc.execute.return_value = {"success": True, "output": ""}
-        result = server_manager.is_installed()
+        mock_hdc.check_file_exists = Mock(return_value=False)
+        result = server_manager.check_server_installed()
         assert result == False
-    
+
     def test_is_running_true(self, server_manager, mock_hdc):
         """测试正在运行状态"""
-        mock_hdc.execute.return_value = {"success": True, "output": "12345 ohscrcpy_server"}
-        result = server_manager.is_running()
+        mock_hdc.execute.return_value = {"success": True, "stdout": "12345", "stderr": ""}
+        result = server_manager.check_server_running()
         assert result == True
-    
+
     def test_is_running_false(self, server_manager, mock_hdc):
         """测试未运行状态"""
-        mock_hdc.execute.return_value = {"success": True, "output": ""}
-        result = server_manager.is_running()
+        mock_hdc.execute.return_value = {"success": True, "stdout": "", "stderr": ""}
+        result = server_manager.check_server_running()
         assert result == False
-    
+
     def test_stop(self, server_manager, mock_hdc):
         """测试停止服务"""
         mock_hdc.execute.return_value = {"success": True, "output": ""}
-        server_manager.stop()
+        server_manager.stop_server()
         mock_hdc.execute.assert_called()
-    
+
     def test_get_server_state(self, server_manager):
         """测试获取服务状态"""
-        assert hasattr(server_manager, 'is_installed')
-        assert hasattr(server_manager, 'is_running')
-        assert hasattr(server_manager, 'stop')
+        assert hasattr(server_manager, 'check_server_installed')
+        assert hasattr(server_manager, 'check_server_running')
+        assert hasattr(server_manager, 'stop_server')
 
 
 class TestServerManagerResourcePath:

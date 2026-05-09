@@ -12,7 +12,7 @@ REM See the License for the specific language governing permissions and
 REM limitations under the License.
 
 REM ================================================================================
-REM OpenHarmony OHScrcpy 服务端日志删除脚本 (Windows)
+REM                OpenHarmony OHScrcpy 服务端日志删除脚本 (Windows)
 REM ================================================================================
 REM
 REM 功能：从设备删除服务端日志文件
@@ -50,9 +50,9 @@ REM ============================================================================
 
 title OpenHarmony OHScrcpy 服务端日志删除脚本
 color 0a
-echo ===========================================================
-echo      OpenHarmony OHScrcpy 服务端日志删除脚本（Windows平台）
-echo ===========================================================
+echo ===============================================================
+echo      OpenHarmony OHScrcpy 服务端日志删除脚本（Windows平台）    
+echo ===============================================================
 echo.
 
 set SERVER_LOG_DIR=/data/local/tmp

@@ -484,7 +484,44 @@ class MainWindow:
     def _on_combobox_select(self, event: Optional[tk.Event]) -> None:
         """设备选择事件"""
         print_log(LogLevel.INFO, self.log_title, "-"*60)
-        print_log(LogLevel.INFO, self.log_title, f"用户选择设备: {self.device_panel.get_selected_device()}")
+        
+        selected_device = self.device_panel.get_selected_device()
+        print_log(LogLevel.INFO, self.log_title, f"用户选择设备: {selected_device}")
+        
+        # 情况1：正在投屏中
+        if self.is_connected:
+            current_device = self.device_manager.get_current_device()
+            
+            if current_device is None:
+                print_log(LogLevel.WARN, self.log_title, f"投屏中但无法获取当前设备信息")
+                return
+            
+            # 检查是否选择了同一设备
+            if current_device.display_name() == selected_device:
+                print_log(LogLevel.INFO, self.log_title, f"选择了当前正在投屏的设备，保持投屏状态")
+                return
+            
+            # 选择了不同设备，询问用户是否切换
+            print_log(LogLevel.INFO, self.log_title, f"投屏中切换设备: {current_device.display_name()} -> {selected_device}")
+            
+            # 弹出确认对话框
+            response = messagebox.askyesno(
+                "切换设备确认",
+                f"当前正在投屏设备:\n{current_device.display_name()}\n\n"
+                f"是否切换到设备:\n{selected_device}?\n\n"
+                "切换将断开当前投屏连接。"
+            )
+            
+            if not response:
+                # 用户不同意切换，恢复显示为当前投屏设备
+                print_log(LogLevel.INFO, self.log_title, f"用户取消切换，恢复设备选择显示")
+                self.device_panel.set_selected_device(current_device.display_name())
+                return
+            
+            # 用户同意切换，继续后续流程（断开连接将在 _install_and_start_server_async 中执行）
+            print_log(LogLevel.INFO, self.log_title, f"用户确认切换设备，准备断开当前连接")
+        
+        # 情况2：未投屏，或投屏中用户同意切换
         print_log(LogLevel.INFO, self.log_title, f"投屏准备: 开始安装和启动服务端...")
         threading.Thread(target=self._install_and_start_server_async, daemon=True).start()
     
@@ -498,8 +535,17 @@ class MainWindow:
         """异步安装并启动服务端"""
         was_connected = self.is_connected
         
-        self.is_connected = False
-        self.video_client.disconnect()
+        # 只有在连接状态时才触发断开流程
+        if was_connected:
+            print_log(LogLevel.INFO, self.log_title, f"断开当前设备连接...")
+            self.is_connected = False
+            self.video_client.disconnect()
+            
+            self.image_refs.clear()
+            
+            self.device_controller = None
+            
+            print_log(LogLevel.INFO, self.log_title, f"连接已断开，准备切换到新设备")
         
         self._show_waiting_screen()
         
@@ -517,8 +563,6 @@ class MainWindow:
         self.video_ratio = 0.0
         self.display_width = 0
         self.display_height = 0
-        
-        self.device_controller = None
         
         selected = self.device_panel.get_selected_device()
         if not selected:

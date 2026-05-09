@@ -21,6 +21,8 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Optional, List
 
+from core import LogLevel, print_log
+
 
 class DevicePanel:
     """设备选择面板"""
@@ -82,6 +84,13 @@ class DevicePanel:
     def get_frame(self) -> tk.LabelFrame:
         """获取面板frame"""
         return self.frame
+    
+    def set_selected_device(self, display_name: str) -> None:
+        """设置选中的设备（用于恢复显示）"""
+        if display_name in self.device_combo['values']:
+            self.device_var.set(display_name)
+        else:
+            print_log(LogLevel.WARN, "DevicePanel", f"设备 {display_name} 不在设备列表中")
 
 
 __all__ = ["DevicePanel"]

@@ -12,7 +12,7 @@ REM See the License for the specific language governing permissions and
 REM limitations under the License.
 
 REM ================================================================================
-REM OpenHarmony OHScrcpy 服务端日志管理脚本 (Windows - 拉取并删除)
+REM          OpenHarmony OHScrcpy 服务端日志管理脚本 (Windows - 拉取并删除)
 REM ================================================================================
 REM
 REM 功能：串行执行拉取+删除服务端日志文件
@@ -51,9 +51,9 @@ REM ============================================================================
 
 title OpenHarmony OHScrcpy 服务端日志拉取并删除脚本
 color 0a
-echo ===========================================================
-echo      OpenHarmony OHScrcpy 服务端日志拉取并删除脚本（Windows平台）
-echo ===========================================================
+echo =====================================================================
+echo      OpenHarmony OHScrcpy 服务端日志拉取并删除脚本（Windows平台）    
+echo =====================================================================
 echo.
 
 set SERVER_LOG_DIR=/data/local/tmp
@@ -155,8 +155,6 @@ if defined PID (
     set LOG_PATTERN=server_*.log
 )
 
-REM ========== 第一步：拉取日志 ==========
-
 echo.
 echo ========================================
 echo 第一步：拉取日志到本地
@@ -191,12 +189,10 @@ for /f "delims=" %%i in ('%HDC_CMD% -t %SELECTED_DEVICE% shell "ls %SERVER_LOG_D
 )
 
 echo.
-echo ****************************
+echo *********************************
 echo [完成] 已拉取 %FETCH_COUNT% 个日志文件到: %DEST_DIR%\
-echo ****************************
+echo *********************************
 echo.
-
-REM ========== 第二步：删除日志 ==========
 
 echo.
 echo ========================================
@@ -208,9 +204,9 @@ if defined PID (
     REM 指定PID：直接删除，无需确认
     echo [信息] 删除PID=%PID%的日志文件...
     %HDC_CMD% -t %SELECTED_DEVICE% shell "rm -f %SERVER_LOG_DIR%/server_%PID%_*.log"
-    echo ****************************
+    echo *******************************
     echo [完成] 已删除设备上的日志文件
-    echo ****************************
+    echo *******************************
 ) else (
     REM 不指定PID：批量删除，需要确认
     echo -----------------------------------------
@@ -223,9 +219,9 @@ if defined PID (
     
     if /i "!CONFIRM!"=="y" (
         %HDC_CMD% -t %SELECTED_DEVICE% shell "rm -f %SERVER_LOG_DIR%/server_*.log"
-        echo ****************************
+        echo ***********************************
         echo [完成] 已删除设备上的所有日志文件
-        echo ****************************
+        echo ***********************************
     ) else (
         echo [信息] 删除操作已取消（日志已拉取到本地）
     )

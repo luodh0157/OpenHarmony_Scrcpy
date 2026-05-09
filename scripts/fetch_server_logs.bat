@@ -12,7 +12,7 @@ REM See the License for the specific language governing permissions and
 REM limitations under the License.
 
 REM ================================================================================
-REM OpenHarmony OHScrcpy 服务端日志拉取脚本 (Windows)
+REM                OpenHarmony OHScrcpy 服务端日志拉取脚本 (Windows)
 REM ================================================================================
 REM
 REM 功能：从设备拉取服务端日志文件到本地logs目录（不删除设备上的日志文件）
@@ -51,9 +51,9 @@ REM ============================================================================
 
 title OpenHarmony OHScrcpy 服务端日志拉取脚本
 color 0a
-echo ===========================================================
-echo      OpenHarmony OHScrcpy 服务端日志拉取脚本（Windows平台）
-echo ===========================================================
+echo ===============================================================
+echo      OpenHarmony OHScrcpy 服务端日志拉取脚本（Windows平台）    
+echo ===============================================================
 echo.
 
 set SERVER_LOG_DIR=/data/local/tmp
@@ -181,8 +181,8 @@ for /f "delims=" %%i in ('%HDC_CMD% -t %SELECTED_DEVICE% shell "ls %SERVER_LOG_D
 )
 
 echo.
-echo ****************************
+echo *********************************
 echo [完成] 日志文件已拉取到: %DEST_DIR%\
-echo ****************************
+echo *********************************
 echo.
 pause

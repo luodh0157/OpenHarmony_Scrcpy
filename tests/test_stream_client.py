@@ -18,6 +18,7 @@
 """
 
 import pytest
+import time
 import socket
 import struct
 import queue
@@ -143,7 +144,7 @@ class TestVideoStreamClientPacketHandling:
         """测试心跳包处理"""
         packet_data = b''
         client_with_decoder._handle_packet(PacketType.PACKET_HEARTBEAT, 0, packet_data)
-        assert client_with_decoder.last_heartbeat_time > 0
+        assert client_with_decoder.last_data_time > 0
     
     def test_handle_config_packet(self, client_with_decoder):
         """测试配置包处理"""
@@ -203,12 +204,15 @@ class TestVideoStreamClientDisconnect:
     
     def test_disconnect_calls_cleanup(self, connected_client):
         """测试断开连接调用清理"""
+        mock_decoder = connected_client.decoder
         connected_client.disconnect()
-        connected_client.decoder.cleanup.assert_called()
-    
+        time.sleep(0.2)
+        mock_decoder.cleanup.assert_called()
+
     def test_disconnect_clears_socket(self, connected_client):
         """测试断开连接清理socket"""
         connected_client.disconnect()
+        time.sleep(0.2)
         assert connected_client.socket is None
 
 
