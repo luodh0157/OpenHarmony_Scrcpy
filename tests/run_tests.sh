@@ -20,6 +20,9 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
+# 禁止生成Python字节码缓存，避免 __pycache__ 目录污染代码仓库
+export PYTHONDONTWRITEBYTECODE=1
+
 echo "=========================================="
 echo "OpenHarmony_Scrcpy Unit Tests"
 echo "=========================================="
@@ -55,3 +58,10 @@ echo ""
 echo "=========================================="
 echo "Tests Complete"
 echo "=========================================="
+
+# 清理可能遗留的缓存目录（保险机制）
+echo ""
+echo "Cleaning up cache directories..."
+find tests Client -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+rm -rf .pytest_cache 2>/dev/null || true
+echo "Cleanup complete"

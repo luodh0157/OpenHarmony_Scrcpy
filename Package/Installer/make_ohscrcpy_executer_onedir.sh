@@ -410,6 +410,6 @@ echo "生成文件: ${EXECUTABLE_NAME}"
 echo ""
 
 echo "下一步："
-echo "  ./make_ohscrcpy_executer.sh"
+echo "  ./make_ohscrcpy_installer.sh"
 echo ""
 read -p "按任意键继续..."
