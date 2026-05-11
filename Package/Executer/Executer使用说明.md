@@ -40,10 +40,10 @@ prepare_for_executer.bat
   说明：Windows平台使用`make_ohscrcpy_executer.bat`脚本，Linux/macOS平台使用`make_ohscrcpy_executer.sh`。
 
 ### 3. 打包输出
-  打包脚本执行成功后，会生成：
-  - **可执行文件**：`output/{平台}/{架构}/OHScrcpy`
+  打包脚本执行成功后，会在`output/{平台}/{架构}/`目录下生成：
+  - **可执行文件**：`OHScrcpy`
   - **分发zip包**：`OHScrcpy_Exec_{平台}_{架构}_v2.1.zip`（包含可执行文件、日志脚本、hash文件）
-  - **Hash文件**：`output/{平台}/{架构}/OHScrcpy_hash.txt`
+  - **Hash文件**：`OHScrcpy_Exec_{平台}_{架构}_hash.txt`
 
 **说明**：自动化脚本会自动拷贝所有必需文件到`Package/Executer`目录，无需手动操作。
 
@@ -66,7 +66,7 @@ clear_for_executer.bat
 ├── fetch_server_logs.sh/bat (日志拉取脚本)
 ├── delete_server_logs.sh/bat (日志删除脚本)
 ├── fetch_and_delete_server_logs.sh/bat (二合一日志管理脚本)
-└── OHScrcpy_hash.txt
+└── OHScrcpy_Exec_{平台}_{架构}_hash.txt
 ```
 
 **使用方式**：

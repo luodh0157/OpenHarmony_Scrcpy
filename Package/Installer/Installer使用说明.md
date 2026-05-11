@@ -2,7 +2,7 @@
 **Installer打包工具**通过pyinstaller工具把整个OpenHarmony_OHScrcpy运行时需要的所有部件（python运行时/python依赖库/ohscrcpy_client/ohscrcpy_server）打包到一个没有任何依赖的可执行文件和依赖目录，并将可执行文件和依赖目录打包成各平台的安装包，便于用户便捷分发和使用。
 
 ## 安装程序制作原理
-- **Windows平台**：使用Inno Steup制作安装程序
+- **Windows平台**：使用Inno Steup制作安装程序，需要提前安装
 - **Linux/macOS平台**：使用直接打包ZIP压缩包+安装脚本的方式制作安装程序
 
 ## 系统要求
@@ -47,16 +47,15 @@ prepare_for_installer.bat
   
   **注意**：
   
-  (1) Windows平台使用**Inno Setup免签名**方式制作安装包，制做安装包和安装过程中会被杀毒软件误认为是病毒而拦截，请执行该脚本前暂时**关闭杀毒软件**。
+  (1) Windows平台使用`Inno Setup`方式制作安装包，需要用户提前安装，下载地址: https://jrsoftware.org/isdl.php。
   
-  (2) Windows平台脚本执行过程中会自动拉起Inno Setup安装包制作工具的GUI操作界面，需要**用户点击**`开始`按钮，开始自动制作；另外，制作完成后会自动拉起试安装GUI界面，用于调试安装向导，按照指引一步步完成操作即可。
-  
-  ![InnoSetup工具界面操作.png](InnoSetup工具界面操作.png 'InnoSetup工具界面操作.png')
-  
-  ![OHScrcpy安装向导.png](OHScrcpy安装向导.png 'OHScrcpy安装向导.png')
+  (2) Windows平台使用**Inno Setup免签名**方式制作安装包，制做安装包和安装过程中会被杀毒软件误认为是病毒而拦截，请执行该脚本前暂时**关闭杀毒软件**。
 
 ### 4. 打包输出路径
-  `make_ohscrcpy_installer`打包脚本执行成功后，安装包文件`OHScrcpy_Setup_[{平台名}]_{版本号}`及其对应的hash文件`OHScrcpy_setup_[{平台名}]_hash.txt`会保存在`output`目录下对应的平台目录中。
+  `make_ohscrcpy_installer`打包脚本执行成功后，会在`output/{平台}/{架构}/`目录下生成：
+  - **Windows安装包**：`OHScrcpy_Setup_{平台}_{架构}_{版本}.exe`
+  - **Linux/macOS分发zip包**：`OHScrcpy_Setup_{平台}_{架构}_v2.1.zip`（包含可执行文件、日志脚本、hash文件）
+  - **Hash文件**：`OHScrcpy_setup_{平台}_{架构}_hash.txt`
 
 ## 用户安装后的目录结构
 
