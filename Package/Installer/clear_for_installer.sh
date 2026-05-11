@@ -31,10 +31,10 @@
 # ================================================================================
 
 export TERM=xterm-256color
-clear
+#clear
 
 echo -e "\033[32m===================================================================\033[0m"
-echo -e "\033[32m     OpenHarmony OHScrcpy Installer资源清理脚本（Linux/Mac平台）   \033[0m"
+echo -e "\033[32m    OpenHarmony OHScrcpy Installer资源清理脚本（Linux/Mac平台）    \033[0m"
 echo -e "\033[32m===================================================================\033[0m"
 echo ""
 
@@ -53,6 +53,7 @@ rm -f main.py ohscrcpy_server ohscrcpy_server.cfg
 rm -rf HUAWEI
 
 rm -f OHScrcpy.spec
+rm -f docs/CHANGELOG.txt
 rm -f fetch_server_logs.sh fetch_server_logs.bat
 rm -f delete_server_logs.sh delete_server_logs.bat
 rm -f fetch_and_delete_server_logs.sh fetch_and_delete_server_logs.bat
@@ -70,4 +71,7 @@ echo -e "\033[32m[完成] 资源清理完成！\033[0m"
 echo -e "\033[32m****************************\033[0m"
 echo ""
 
-read -p "按任意键继续..."
+
+if [ -z "${NO_PAUSE+set}" ]; then
+    read -p "按任意键继续..."
+fi

@@ -412,4 +412,7 @@ echo ""
 echo "下一步："
 echo "  ./make_ohscrcpy_installer.sh"
 echo ""
-read -p "按任意键继续..."
+
+if [ -z "${NO_PAUSE+set}" ]; then
+    read -p "按任意键继续..."
+fi

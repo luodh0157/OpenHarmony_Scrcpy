@@ -73,12 +73,13 @@ fi
 
 echo "[信息] 清理目标目录旧文件..."
 cd "$TARGET_DIR"
-rm -rf core video gui utils config hdc scripts
-rm -f main.py ohscrcpy_server ohscrcpy_server.cfg
-rm -rf HUAWEI
-rm -f fetch_server_logs.sh fetch_server_logs.bat
-rm -f delete_server_logs.sh delete_server_logs.bat
-rm -f fetch_and_delete_server_logs.sh fetch_and_delete_server_logs.bat
+if [ -f "clear_for_executer.sh" ]; then
+    chmod +x clear_for_executer.sh
+    ./clear_for_executer.sh
+else
+    echo "[警告] clear_for_executer.sh 文件不存在，请手动清理！"
+    exit 1
+fi
 cd "$SCRIPT_DIR"
 echo "[完成] 清理完成"
 echo ""
@@ -127,6 +128,7 @@ echo -e "\033[32m****************************\033[0m"
 echo -e "\033[32m[完成] 资源准备完成！\033[0m"
 echo -e "\033[32m****************************\033[0m"
 echo ""
+
 echo "已拷贝的文件和目录："
 cd "$TARGET_DIR"
 ls -la | grep -E "^d|^-" | grep -v "^total"
@@ -135,4 +137,7 @@ echo ""
 echo "下一步："
 echo "  ./make_ohscrcpy_executer.sh"
 echo ""
-read -p "按任意键继续..."
+
+if [ -z "${NO_PAUSE+set}" ]; then
+    read -p "按任意键继续..."
+fi

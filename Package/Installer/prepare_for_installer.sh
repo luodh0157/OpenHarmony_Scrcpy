@@ -42,9 +42,9 @@
 export TERM=xterm-256color
 clear
 
-echo -e "\033[32m====================================================================\033[0m"
-echo -e "\033[32m     OpenHarmony OHScrcpy Installer资源准备脚本（Linux/Mac平台）    \033[0m"
-echo -e "\033[32m====================================================================\033[0m"
+echo -e "\033[32m===================================================================\033[0m"
+echo -e "\033[32m    OpenHarmony OHScrcpy Installer资源准备脚本（Linux/Mac平台）    \033[0m"
+echo -e "\033[32m===================================================================\033[0m"
 echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,12 +74,13 @@ fi
 
 echo "[信息] 清理目标目录旧文件..."
 cd "$TARGET_DIR"
-rm -rf core video gui utils config hdc scripts
-rm -f main.py ohscrcpy_server ohscrcpy_server.cfg
-rm -rf HUAWEI
-rm -f fetch_server_logs.sh fetch_server_logs.bat
-rm -f delete_server_logs.sh delete_server_logs.bat
-rm -f fetch_and_delete_server_logs.sh fetch_and_delete_server_logs.bat
+if [ -f "clear_for_installer.sh" ]; then
+    chmod +x clear_for_installer.sh
+    ./clear_for_installer.sh
+else
+    echo "[警告] clear_for_installer.sh 文件不存在，请手动清理！"
+    exit 1
+fi
 cd "$SCRIPT_DIR"
 echo "[完成] 清理完成"
 echo ""
@@ -147,4 +148,8 @@ echo "下一步："
 echo "  ./make_ohscrcpy_executer_onedir.sh"
 echo "  ./make_ohscrcpy_installer.sh"
 echo ""
-read -p "按任意键继续..."
+
+if [ -z "${NO_PAUSE+set}" ]; then
+    read -p "按任意键继续..."
+fi
+

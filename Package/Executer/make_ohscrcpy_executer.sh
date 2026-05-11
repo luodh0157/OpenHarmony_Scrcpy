@@ -328,7 +328,7 @@ generate_hash() {
 }
 
 # 生成哈希文件
-HASH_FILE="output/${OS_TYPE}/${ARCH}/OHScrcpy_hash.txt"
+HASH_FILE="output/${OS_TYPE}/${ARCH}/OHScrcpy_Exec_${OS_TYPE}_${ARCH}_hash.txt"
 if generate_hash "dist/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
     echo "[完成] 哈希文件已生成：${HASH_FILE}"
     echo ""
@@ -374,9 +374,9 @@ fi
 cd output/${OS_TYPE}/${ARCH}
 
 if [ -n "$LOG_SCRIPTS" ]; then
-    zip -r "${ZIP_NAME}" ${EXECUTABLE_NAME} OHScrcpy_hash.txt ${LOG_SCRIPTS}
+    zip -r "${ZIP_NAME}" ${EXECUTABLE_NAME} OHScrcpy_Exec_${OS_TYPE}_${ARCH}_hash.txt ${LOG_SCRIPTS}
 else
-    zip -r "${ZIP_NAME}" ${EXECUTABLE_NAME} OHScrcpy_hash.txt
+    zip -r "${ZIP_NAME}" ${EXECUTABLE_NAME} OHScrcpy_Exec_${OS_TYPE}_${ARCH}_hash.txt
 fi
 
 cd ../../..
@@ -395,10 +395,13 @@ echo "操作系统: ${OS_TYPE}"
 echo "输出目录: output/${OS_TYPE}/${ARCH}/"
 echo "生成文件:"
 echo "  - ${EXECUTABLE_NAME}"
-echo "  - OHScrcpy_hash.txt"
+echo "  - OHScrcpy_Exec_${OS_TYPE}_${ARCH}_hash.txt"
 if [ -n "$LOG_SCRIPTS" ]; then
     echo "  - 日志脚本（3个.sh文件）"
 fi
 echo "  - ${ZIP_NAME}"
 echo ""
-read -p "按任意键继续..."
+
+if [ -z "${NO_PAUSE+set}" ]; then
+    read -p "按任意键继续..."
+fi

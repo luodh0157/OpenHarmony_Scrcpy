@@ -158,4 +158,7 @@ echo "操作系统: ${OS_TYPE}"
 echo "输出目录: ${OUTPUT_DIR}"
 echo "生成文件: ${EXECUTABLE_NAME}"
 echo ""
-read -p "按任意键继续..."
+
+if [ -z "${NO_PAUSE+set}" ]; then
+    read -p "按任意键继续..."
+fi
