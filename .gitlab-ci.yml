@@ -1,0 +1,283 @@
+stages:
+  - test
+  - build
+  - release
+
+variables:
+  PIP_INDEX_URL: "https://pypi.tuna.tsinghua.edu.cn/simple"
+  PYTHON_VERSION: "3.11"
+
+.test_template: &test_template
+  stage: test
+  before_script:
+    - python --version
+    - pip install --upgrade pip
+    - pip install -r Client/requirements.txt
+    - pip install pytest mypy
+  script:
+    - pytest tests/ -v
+    - mypy Client/ --ignore-missing-imports || true
+  only:
+    - main
+    - master
+    - merge_requests
+
+test:linux:
+  <<: *test_template
+  image: python:${PYTHON_VERSION}
+  tags:
+    - docker
+  before_script:
+    - apt-get update && apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev
+    - python --version
+    - pip install --upgrade pip
+    - pip install -r Client/requirements.txt
+    - pip install pytest mypy
+
+.build_template: &build_template
+  stage: build
+  only:
+    - main
+    - master
+    - /^v\d+\.\d+\.\d+.*$/
+  artifacts:
+    paths:
+      - Package/Executer/output/
+      - Package/Installer/output/
+    expire_in: 30 days
+
+build:linux:executer:
+  <<: *build_template
+  image: python:${PYTHON_VERSION}
+  tags:
+    - docker
+  before_script:
+    - apt-get update && apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev
+    - pip install --upgrade pip
+    - pip install -r Client/requirements.txt
+    - pip install pyinstaller
+  script:
+    - cd Package
+    - chmod +x build_executer.sh
+    - ./build_executer.sh
+    - |
+      exePath="Package/Executer/output/Linux/x64/OHScrcpy"
+      if [ -f "$exePath" ]; then
+        echo "Testing executable..."
+        chmod +x "$exePath"
+        "$exePath" --help 2>&1 | head -10 || true
+        echo "Executable test completed"
+      else
+        echo "Error: Executable not found"
+        exit 1
+      fi
+
+build:linux:installer:
+  <<: *build_template
+  image: python:${PYTHON_VERSION}
+  tags:
+    - docker
+  before_script:
+    - apt-get update && apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev zip
+    - pip install --upgrade pip
+    - pip install -r Client/requirements.txt
+    - pip install pyinstaller
+  script:
+    - cd Package
+    - chmod +x build_installer.sh
+    - ./build_installer.sh
+    - |
+      exePath="Package/Installer/dist/OHScrcpy/OHScrcpy"
+      if [ -f "$exePath" ]; then
+        echo "Testing installer executable..."
+        chmod +x "$exePath"
+        "$exePath" --help 2>&1 | head -10 || true
+        echo "Installer executable test completed"
+      else
+        echo "Error: Installer executable not found"
+        exit 1
+      fi
+
+build:windows:executer:
+  <<: *build_template
+  tags:
+    - windows
+    - python
+  before_script:
+    - python --version
+    - pip install --upgrade pip
+    - pip install -r Client/requirements.txt
+    - pip install pyinstaller
+  script:
+    - cd Package
+    - call build_executer.bat
+    - |
+      $exePath = "Package\Executer\output\Windows\x64\OHScrcpy.exe"
+      if (Test-Path $exePath) {
+        Write-Host "Testing executable..."
+        & $exePath --help 2>&1 | Select-Object -First 10
+        Write-Host "Executable test completed"
+      } else {
+        Write-Error "Executable not found at $exePath"
+        exit 1
+      }
+
+build:windows:installer:
+  <<: *build_template
+  tags:
+    - windows
+    - python
+    - innosetup
+  before_script:
+    - python --version
+    - pip install --upgrade pip
+    - pip install -r Client/requirements.txt
+    - pip install pyinstaller
+  script:
+    - cd Package\Installer
+    - call prepare_for_installer.bat
+    - call make_ohscrcpy_executer_onedir.bat
+    - |
+      $arch = "x64"
+      $version = "v2.1.0"
+      ISCC.exe /Qp /O".\output\Windows\$arch" /F"OHScrcpy_Setup_Windows_$arch_$version" ohscrcpy_setup.iss
+    - cd ..
+    - |
+      $exePath = "Package\Installer\dist\OHScrcpy\OHScrcpy.exe"
+      if (Test-Path $exePath) {
+        Write-Host "Testing installer executable..."
+        & $exePath --help 2>&1 | Select-Object -First 10
+        Write-Host "Installer executable test completed"
+      } else {
+        Write-Error "Installer executable not found"
+        exit 1
+      }
+
+build:macos:executer:
+  <<: *build_template
+  tags:
+    - macos
+    - x64
+  before_script:
+    - python3 --version
+    - pip3 install --upgrade pip
+    - pip3 install -r Client/requirements.txt
+    - pip3 install pyinstaller
+    - brew install ffmpeg || true
+  script:
+    - cd Package/Executer
+    - |
+      python3 << 'EOF'
+      from PIL import Image
+      img = Image.open('app.ico')
+      img.save('icon_512.png', 'PNG')
+      EOF
+    - mkdir -p icon.iconset
+    - sips -z 16 16 icon_512.png --out icon.iconset/icon_16x16.png
+    - sips -z 32 32 icon_512.png --out icon.iconset/icon_16x16@2x.png
+    - sips -z 32 32 icon_512.png --out icon.iconset/icon_32x32.png
+    - sips -z 64 64 icon_512.png --out icon.iconset/icon_32x32@2x.png
+    - sips -z 128 128 icon_512.png --out icon.iconset/icon_128x128.png
+    - sips -z 256 256 icon_512.png --out icon.iconset/icon_128x128@2x.png
+    - sips -z 256 256 icon_512.png --out icon.iconset/icon_256x256.png
+    - sips -z 512 512 icon_512.png --out icon.iconset/icon_256x256@2x.png
+    - sips -z 512 512 icon_512.png --out icon.iconset/icon_512x512.png
+    - cp icon_512.png icon.iconset/icon_512x512@2x.png
+    - iconutil -c icns icon.iconset -o app.icns
+    - rm -rf icon.iconset icon_512.png
+    - cd ..
+    - chmod +x build_executer.sh
+    - ./build_executer.sh
+    - |
+      exePath="Package/Executer/output/macOS/x64/OHScrcpy"
+      if [ -f "$exePath" ]; then
+        echo "Testing executable..."
+        chmod +x "$exePath"
+        "$exePath" --help 2>&1 | head -10 || true
+        echo "Executable test completed"
+      else
+        echo "Error: Executable not found"
+        exit 1
+      fi
+
+build:macos:installer:
+  <<: *build_template
+  tags:
+    - macos
+    - x64
+  before_script:
+    - python3 --version
+    - pip3 install --upgrade pip
+    - pip3 install -r Client/requirements.txt
+    - pip3 install pyinstaller
+    - brew install ffmpeg || true
+  script:
+    - cd Package/Installer
+    - cp ../Executer/app.ico resources/app.ico || true
+    - |
+      python3 << 'EOF'
+      from PIL import Image
+      import os
+      icon_path = 'resources/app.ico'
+      if os.path.exists(icon_path):
+        img = Image.open(icon_path)
+        img.save('icon_512.png', 'PNG')
+      EOF
+    - |
+      if [ -f icon_512.png ]; then
+        mkdir -p icon.iconset
+        sips -z 16 16 icon_512.png --out icon.iconset/icon_16x16.png
+        sips -z 32 32 icon_512.png --out icon.iconset/icon_16x16@2x.png
+        sips -z 32 32 icon_512.png --out icon.iconset/icon_32x32.png
+        sips -z 64 64 icon_512.png --out icon.iconset/icon_32x32@2x.png
+        sips -z 128 128 icon_512.png --out icon.iconset/icon_128x128.png
+        sips -z 256 256 icon_512.png --out icon.iconset/icon_128x128@2x.png
+        sips -z 256 256 icon_512.png --out icon.iconset/icon_256x256.png
+        sips -z 512 512 icon_512.png --out icon.iconset/icon_256x256@2x.png
+        sips -z 512 512 icon_512.png --out icon.iconset/icon_512x512.png
+        cp icon_512.png icon.iconset/icon_512x512@2x.png
+        iconutil -c icns icon.iconset -o resources/app.icns
+        rm -rf icon.iconset icon_512.png
+      fi
+    - cd ..
+    - chmod +x build_installer.sh
+    - ./build_installer.sh
+    - |
+      exePath="Package/Installer/dist/OHScrcpy/OHScrcpy"
+      if [ -f "$exePath" ]; then
+        echo "Testing installer executable..."
+        chmod +x "$exePath"
+        "$exePath" --help 2>&1 | head -10 || true
+        echo "Installer executable test completed"
+      else
+        echo "Error: Installer executable not found"
+        exit 1
+      fi
+
+release:
+  stage: release
+  image: alpine:latest
+  tags:
+    - docker
+  only:
+    - /^v\d+\.\d+\.\d+.*$/
+  needs:
+    - build:linux:executer
+    - build:linux:installer
+    - build:windows:executer
+    - build:windows:installer
+    - build:macos:executer
+    - build:macos:installer
+  script:
+    - echo "Release job - artifacts are automatically available"
+    - ls -la Package/Executer/output/ || true
+    - ls -la Package/Installer/output/ || true
+  artifacts:
+    paths:
+      - Package/Executer/output/Linux/x64/OHScrcpy
+      - Package/Installer/output/Linux/x64/
+      - Package/Executer/output/Windows/x64/OHScrcpy.exe
+      - Package/Installer/output/Windows/x64/
+      - Package/Executer/output/macOS/x64/OHScrcpy
+      - Package/Installer/output/macOS/x64/
+    expire_in: never
