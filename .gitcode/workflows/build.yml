@@ -1,0 +1,96 @@
+name: Build OHScrcpy Linux
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-executer:
+    runs-on: euleros-2.10.1
+    steps:
+      - uses: checkout-action@0.0.1
+      
+      - name: Setup Python
+        uses: setup-python@0.0.1
+        with:
+          python-version: '3.11'
+      
+      - name: Install system dependencies
+        run: |
+          yum install -y ffmpeg ffmpeg-devel || true
+          pip install --upgrade pip
+          pip install -r repo_workspace/Client/requirements.txt
+          pip install pyinstaller
+      
+      - name: Build Executer
+        run: |
+          cd repo_workspace/Package
+          chmod +x build_executer.sh
+          ./build_executer.sh
+      
+      - name: Test executable
+        run: |
+          exePath="repo_workspace/Package/Executer/output/Linux/x64/OHScrcpy"
+          if [ -f "$exePath" ]; then
+            echo "Testing executable..."
+            chmod +x "$exePath"
+            "$exePath" --help 2>&1 | head -10 || true
+            echo "Executable test completed"
+          else
+            echo "Error: Executable not found"
+            exit 1
+          fi
+      
+      - name: Upload Executer artifact
+        uses: upload-artifact@0.0.1
+        with:
+          name: OHScrcpy-Executer-Linux-x64
+          path: repo_workspace/Package/Executer/output/Linux/x64/
+          retention-days: 30
+
+  build-installer:
+    runs-on: euleros-2.10.1
+    steps:
+      - uses: checkout-action@0.0.1
+      
+      - name: Setup Python
+        uses: setup-python@0.0.1
+        with:
+          python-version: '3.11'
+      
+      - name: Install system dependencies
+        run: |
+          yum install -y ffmpeg ffmpeg-devel zip || true
+          pip install --upgrade pip
+          pip install -r repo_workspace/Client/requirements.txt
+          pip install pyinstaller
+      
+      - name: Build Installer
+        run: |
+          cd repo_workspace/Package
+          chmod +x build_installer.sh
+          ./build_installer.sh
+      
+      - name: Test installer executable
+        run: |
+          exePath="repo_workspace/Package/Installer/dist/OHScrcpy/OHScrcpy"
+          if [ -f "$exePath" ]; then
+            echo "Testing installer executable..."
+            chmod +x "$exePath"
+            "$exePath" --help 2>&1 | head -10 || true
+            echo "Installer executable test completed"
+          else
+            echo "Error: Installer executable not found"
+            exit 1
+          fi
+      
+      - name: Upload Installer artifact
+        uses: upload-artifact@0.0.1
+        with:
+          name: OHScrcpy-Installer-Linux-x64
+          path: repo_workspace/Package/Installer/output/Linux/x64/
+          retention-days: 30

@@ -1,0 +1,31 @@
+name: Test OHScrcpy
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test:
+    runs-on: euleros-2.10.1
+    steps:
+      - uses: checkout-action@0.0.1
+      
+      - name: Setup Python
+        uses: setup-python@0.0.1
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd repo_workspace
+          pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pytest mypy
+      
+      - name: Run tests
+        run: |
+          cd repo_workspace
+          pytest tests/ -v
+          mypy Client/ --ignore-missing-imports || true
