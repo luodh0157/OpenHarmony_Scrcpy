@@ -29,11 +29,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies (with Tsinghua mirror)
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install -r Client/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
+          python -m pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pyinstaller
 
       - name: Build Executer
         run: |
@@ -78,11 +78,11 @@ jobs:
         run: |
           choco install innosetup -y
 
-      - name: Install Python dependencies (with Tsinghua mirror)
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install -r Client/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
+          python -m pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pyinstaller
 
       - name: Build Installer (skip pause in CI)
         run: |
@@ -138,11 +138,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev
 
-      - name: Install Python dependencies (with Tsinghua mirror)
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install -r Client/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
+          python -m pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pyinstaller
 
       - name: Build Executer
         run: |
@@ -190,11 +190,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev
 
-      - name: Install Python dependencies (with Tsinghua mirror)
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install -r Client/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
+          python -m pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pyinstaller
 
       - name: Build Installer
         run: |
@@ -240,11 +240,11 @@ jobs:
       - name: Install FFmpeg
         run: brew install ffmpeg
 
-      - name: Install Python dependencies (with Tsinghua mirror)
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install -r Client/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
+          python -m pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pyinstaller
 
       - name: Generate macOS icon (.icns)
         run: |
@@ -313,11 +313,11 @@ jobs:
       - name: Install FFmpeg
         run: brew install ffmpeg
 
-      - name: Install Python dependencies (with Tsinghua mirror)
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install -r Client/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
+          python -m pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pyinstaller
 
       - name: Generate macOS icon (.icns) for Installer
         run: |
@@ -391,11 +391,11 @@ jobs:
       - name: Install FFmpeg
         run: brew install ffmpeg
 
-      - name: Install Python dependencies (with Tsinghua mirror)
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install -r Client/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
+          python -m pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pyinstaller
 
       - name: Generate macOS icon (.icns)
         run: |
@@ -463,11 +463,11 @@ jobs:
       - name: Install FFmpeg
         run: brew install ffmpeg
 
-      - name: Install Python dependencies (with Tsinghua mirror)
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install -r Client/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-          pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
+          python -m pip install --upgrade pip
+          pip install -r Client/requirements.txt
+          pip install pyinstaller
 
       - name: Generate macOS icon (.icns) for Installer
         run: |
@@ -492,7 +492,7 @@ jobs:
             sips -z 256 256 icon_512.png --out icon.iconset/icon_256x256.png
             sips -z 512 512 icon_512.png --out icon.iconset/icon_256x256@2x.png
             sips -z 512 512 icon_512.png --out icon.iconset/icon_512x512.png
-            cp icon_512.png icon.iconset/icon_512x512@2p.png
+            cp icon_512.png icon.iconset/icon_512x512@2x.png
             iconutil -c icns icon.iconset -o resources/app.icns
             rm -rf icon.iconset icon_512.png
           fi
@@ -567,14 +567,14 @@ jobs:
             
             | Type | Platform | Architecture | File |
             |------|----------|-------------|------|
-            | Executer | Windows | x64 | `OHScrcpy-Exec-Windows-x64-*.zip` |
-            | Executer | Linux | x64 | `OHScrcpy-Exec-Linux-x64-*.zip` |
-            | Executer | macOS | arm64 (M1/M2/M3) | `OHScrcpy-Exec-macOS-arm64-*.zip` |
-            | Executer | macOS | x64 (Intel) | `OHScrcpy-Exec-macOS-x64-*.zip` |
-            | Installer | Windows | x64 | `OHScrcpy-Setup-Windows-x64-*.exe` |
-            | Installer | Linux | x64 | `OHScrcpy-Setup-Linux-x64-*.zip` |
-            | Installer | macOS | arm64 | `OHScrcpy-Setup-macOS-arm64-*.zip` |
-            | Installer | macOS | x64 | `OHScrcpy-Setup-macOS-x64-*.zip` |
+            | Executer | Windows | x64 | `OHScrcpy_Exec_Windows_x64_*.zip` |
+            | Executer | Linux | x64 | `OHScrcpy_Exec_Linux_x64_*.zip` |
+            | Executer | macOS | arm64 (M1/M2/M3) | `OHScrcpy_Exec_macOS_arm64_*.zip` |
+            | Executer | macOS | x64 (Intel) | `OHScrcpy_Exec_macOS_x64_*.zip` |
+            | Installer | Windows | x64 | `OHScrcpy_Setup_Windows_x64_*.exe` |
+            | Installer | Linux | x64 | `OHScrcpy_Setup_Linux_x64_*.zip` |
+            | Installer | macOS | arm64 | `OHScrcpy_Setup_macOS_arm64_*.zip` |
+            | Installer | macOS | x64 | `OHScrcpy_Setup_macOS_x64_*.zip` |
             
             ### Executer (单文件)
             

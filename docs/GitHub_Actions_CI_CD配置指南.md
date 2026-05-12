@@ -244,14 +244,14 @@ OHScrcpy_Setup_macOS_x64_v2.2.0.zip      # macOS x64 安装包
 
 | Type | Platform | Architecture | File |
 |------|----------|-------------|------|
-| Executer | Windows | x64 | OHScrcpy-Exec-Windows-x64-*.zip |
-| Executer | Linux | x64 | OHScrcpy-Exec-Linux-x64-*.zip |
-| Executer | macOS | arm64 (M1/M2/M3) | OHScrcpy-Exec-macOS-arm64-*.zip |
-| Executer | macOS | x64 (Intel) | OHScrcpy-Exec-macOS-x64-*.zip |
-| Installer | Windows | x64 | OHScrcpy-Setup-Windows-x64-*.exe |
-| Installer | Linux | x64 | OHScrcpy-Setup-Linux-x64-*.zip |
-| Installer | macOS | arm64 | OHScrcpy-Setup-macOS-arm64-*.zip |
-| Installer | macOS | x64 | OHScrcpy-Setup-macOS-x64-*.zip |
+| Executer | Windows | x64 | OHScrcpy_Exec_Windows_x64_*.zip |
+| Executer | Linux | x64 | OHScrcpy_Exec_Linux_x64_*.zip |
+| Executer | macOS | arm64 (M1/M2/M3) | OHScrcpy_Exec_macOS_arm64_*.zip |
+| Executer | macOS | x64 (Intel) | OHScrcpy_Exec_macOS_x64_*.zip |
+| Installer | Windows | x64 | OHScrcpy_Setup_Windows_x64_*.exe |
+| Installer | Linux | x64 | OHScrcpy_Setup_Linux_x64_*.zip |
+| Installer | macOS | arm64 | OHScrcpy_Setup_macOS_arm64_*.zip |
+| Installer | macOS | x64 | OHScrcpy_Setup_macOS_x64_*.zip |
 
 ### Executer (单文件)
 
