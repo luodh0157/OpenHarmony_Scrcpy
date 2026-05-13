@@ -1,4 +1,4 @@
-name: Build OHScrcpy Multi-Platform
+name: Build OpenHarmony OHScrcpy Multi-Platform
 
 on:
   push:

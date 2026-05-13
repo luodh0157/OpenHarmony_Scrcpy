@@ -1,50 +1,15 @@
-# Build outputs
-Package/Executer/output/
-Package/Installer/output/
-Package/Installer/dist/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-venv/
-ENV/
-env/
-.venv/
-
 # IDE
 .vscode/
-.idea/
-*.swp
-*.swo
-*~
 
-# OS
-.DS_Store
-Thumbs.db
+# SKILL
+.skills/
 
-# Logs
-logs/
-*.log
+# DOC
+docs/
 
-# PyInstaller
-*.spec
+# AGENT
+AGENTS.md
+
+# BUILD
+Package/Executer/output/
+Package/Installer/output/

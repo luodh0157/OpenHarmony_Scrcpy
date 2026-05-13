@@ -1,4 +1,4 @@
-name: Build OHScrcpy Linux
+name: Build OpenHarmony OHScrcpy Linux
 
 on:
   push:
