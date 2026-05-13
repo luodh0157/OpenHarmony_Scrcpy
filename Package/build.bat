@@ -61,12 +61,16 @@ goto :main_menu
 
 :build_executer
 echo.
+echo =======================================
 echo 开始Executer打包...
+echo =======================================
 echo.
 if exist "%SCRIPT_DIR%\build_executer.bat" (
     call "%SCRIPT_DIR%\build_executer.bat"
 ) else (
+    echo ---------------------------------------
     echo [错误] 未找到 build_executer.bat
+    echo ---------------------------------------
 )
 echo.
 pause
@@ -74,12 +78,16 @@ goto :main_menu
 
 :build_installer
 echo.
+echo =======================================
 echo 开始Installer打包...
+echo =======================================
 echo.
 if exist "%SCRIPT_DIR%\build_installer.bat" (
     call "%SCRIPT_DIR%\build_installer.bat"
 ) else (
+    echo ---------------------------------------
     echo [错误] 未找到 build_installer.bat
+    echo ---------------------------------------
 )
 echo.
 pause
@@ -95,40 +103,56 @@ echo.
 set SUCCESS_COUNT=0
 set FAIL_COUNT=0
 
+echo +++++++++++++++++++++++++++++++++++++++
 echo [1/2] 开始Executer打包...
+echo +++++++++++++++++++++++++++++++++++++++
 echo.
 if exist "%SCRIPT_DIR%\build_executer.bat" (
     call "%SCRIPT_DIR%\build_executer.bat"
     if !errorlevel! equ 0 (
         set /a SUCCESS_COUNT+=1
         echo.
+        echo ***************************************
         echo Executer打包成功！
+        echo ***************************************
     ) else (
         set /a FAIL_COUNT+=1
         echo.
+        echo ---------------------------------------
         echo Executer打包失败！
+        echo ---------------------------------------
     )
 ) else (
+    echo ---------------------------------------
     echo [错误] 未找到 build_executer.bat
+    echo ---------------------------------------
     set /a FAIL_COUNT+=1
 )
 
 echo.
+echo +++++++++++++++++++++++++++++++++++++++
 echo [2/2] 开始Installer打包...
+echo +++++++++++++++++++++++++++++++++++++++
 echo.
 if exist "%SCRIPT_DIR%\build_installer.bat" (
     call "%SCRIPT_DIR%\build_installer.bat"
     if !errorlevel! equ 0 (
         set /a SUCCESS_COUNT+=1
         echo.
+        echo ***************************************
         echo Installer打包成功！
+        echo ***************************************
     ) else (
         set /a FAIL_COUNT+=1
         echo.
+        echo ---------------------------------------
         echo Installer打包失败！
+        echo ---------------------------------------
     )
 ) else (
+    echo ---------------------------------------
     echo [错误] 未找到 build_installer.bat
+    echo ---------------------------------------
     set /a FAIL_COUNT+=1
 )
 
@@ -151,36 +175,51 @@ pause
 goto :main_menu
 
 :cleanup_all
+set NO_PAUSE=1
 echo.
+echo =======================================
 echo 正在清理所有临时文件...
+echo =======================================
 echo.
 
 cd /d "%SCRIPT_DIR%\Executer"
 if exist clear_for_executer.bat (
     call clear_for_executer.bat
+    echo ***************************************
     echo [完成] Executer目录清理完成
+    echo ***************************************
 ) else (
+    echo ---------------------------------------------------
     echo [警告] 未找到 clear_for_executer.bat，请手动清理！
+    echo ---------------------------------------------------
 )
 cd /d "%SCRIPT_DIR%"
 
 cd /d "%SCRIPT_DIR%\Installer"
 if exist clear_for_installer.bat (
     call clear_for_installer.bat
+    echo ***************************************
     echo [完成] Installer目录清理完成
+    echo ***************************************
 ) else (
+    echo ----------------------------------------------------
     echo [警告] 未找到 clear_for_installer.bat，请手动清理！
+    echo ----------------------------------------------------
 )
 cd /d "%SCRIPT_DIR%"
 
 echo.
+echo =======================================
 echo 所有临时文件已清理完成！
+echo =======================================
 echo.
 pause
 goto :main_menu
 
 :exit_tool
 echo.
+echo =======================================
 echo 退出打包工具！
+echo =======================================
 echo.
 exit /b 0

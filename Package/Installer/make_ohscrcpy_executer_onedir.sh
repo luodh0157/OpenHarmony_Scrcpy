@@ -14,7 +14,7 @@
 # limitations under the License.
 
 export TERM=xterm-256color
-clear
+#clear
 
 echo -e "\033[32m===============================================================\033[0m"
 echo -e "\033[32m     OpenHarmony OHScrcpy 自动化构建脚本（Linux/macOS平台）    \033[0m"
@@ -78,7 +78,7 @@ if ! command -v python3 &> /dev/null; then
         echo "CentOS/RHEL: sudo yum install python3 python3-pip"
     fi
     
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -93,7 +93,7 @@ if ! command -v pyinstaller &> /dev/null; then
         echo "-----------------------------------------"
         echo -e "\033[31m[错误] 未找到pip，请先安装pip\033[0m"
         echo "-----------------------------------------"
-        read -p "按任意键继续..."
+        sleep 5s
         exit 1
     fi
     
@@ -102,7 +102,7 @@ if ! command -v pyinstaller &> /dev/null; then
         echo "---------------------------------------"
         echo -e "\033[31m[错误] PyInstaller安装失败\033[0m"
         echo "---------------------------------------"
-        read -p "按任意键继续..."
+        sleep 5s
         exit 1
     fi
     echo "[成功] PyInstaller安装完成"
@@ -119,7 +119,7 @@ if [ ! -f "main.py" ]; then
     echo "---------------------------------------------------"
     echo -e "\033[31m[错误] 未找到 main.py，请确保该文件存在\033[0m"
     echo "---------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -127,7 +127,7 @@ if [ ! -d "core" ] || [ ! -d "video" ] || [ ! -d "gui" ] || [ ! -d "utils" ]; th
     echo "-------------------------------------------------------"
     echo -e "\033[31m[错误] 未找到模块目录 core/video/gui/utils\033[0m"
     echo "-------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -135,7 +135,7 @@ if [ ! -f "ohscrcpy_server" ]; then
     echo "------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 ohscrcpy_server，请确保该文件存在\033[0m"
     echo "------------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -143,7 +143,7 @@ if [ ! -d "HUAWEI" ]; then
     echo "-------------------------------------------------------"
     echo -e "\033[31m[错误] 未找到 HUAWEI 目录\033[0m"
     echo "-------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -151,7 +151,7 @@ if [ ! -f "HUAWEI/ohscrcpy_server" ]; then
     echo "-------------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 HUAWEI/ohscrcpy_server，请确保该文件存在\033[0m"
     echo "-------------------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -159,7 +159,7 @@ if [ ! -f "ohscrcpy_server.cfg" ]; then
     echo "----------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 ohscrcpy_server.cfg，请确保该文件存在\033[0m"
     echo "----------------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -167,7 +167,7 @@ if [ ! -f "hdc/${OS_NAME}/${ARCH}/hdc" ]; then
     echo "-----------------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 hdc/${OS_NAME}/${ARCH}/hdc，请确保该文件存在\033[0m"
     echo "-----------------------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -175,7 +175,7 @@ if [ ! -f "hdc/${OS_NAME}/${ARCH}/libusb_shared.so" ]; then
     echo "------------------------------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 hdc/${OS_NAME}/${ARCH}/libusb_shared.so，请确保该文件存在\033[0m"
     echo "------------------------------------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -183,7 +183,7 @@ if [ ! -f "resources/app.ico" ] && [ ! -f "resources/app.icns" ]; then
     echo "--------------------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到图标文件 resources/app.ico 或 resources/app.icns\033[0m"
     echo "--------------------------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -208,7 +208,7 @@ if [ $? -ne 0 ]; then
     echo "--------------------------------------"
     echo -e "\033[31m[错误] 安装python依赖失败\033[0m"
     echo "--------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 echo "*****************************"
@@ -273,7 +273,7 @@ if [ $? -ne 0 ]; then
     echo "---------------------------------------"
     echo -e "\033[31m[错误] PyInstaller打包失败\033[0m"
     echo "---------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 echo "****************************"
@@ -286,7 +286,7 @@ if [ ! -f "dist/OHScrcpy/${EXECUTABLE_NAME}" ]; then
     echo "--------------------------------------------------------"
     echo -e "\033[31m[错误] 未生成 ${EXECUTABLE_NAME} 可执行文件\033[0m"
     echo "--------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -294,7 +294,7 @@ if [ ! -f "dist/OHScrcpy/_internal/ohscrcpy_server" ]; then
     echo "-------------------------------------------------"
     echo -e "\033[31m[警告] 未找到打包的 ohscrcpy_server\033[0m"
     echo "-------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -302,7 +302,7 @@ if [ ! -f "dist/OHScrcpy/_internal/ohscrcpy_server.cfg" ]; then
     echo "-----------------------------------------------------"
     echo -e "\033[31m[警告] 未找到打包的 ohscrcpy_server.cfg\033[0m"
     echo "-----------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -310,7 +310,7 @@ if [ ! -f "dist/OHScrcpy/_internal/HUAWEI/ohscrcpy_server" ]; then
     echo "--------------------------------------------------------"
     echo -e "\033[31m[警告] 未找到打包的 HUAWEI/ohscrcpy_server\033[0m"
     echo "--------------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -318,7 +318,7 @@ if [ ! -f "dist/OHScrcpy/_internal/hdc" ]; then
     echo "------------------------------------"
     echo -e "\033[31m[警告] 未找到打包的 hdc\033[0m"
     echo "------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -326,7 +326,7 @@ if [ ! -f "dist/OHScrcpy/_internal/libusb_shared.so" ]; then
     echo "--------------------------------------------------"
     echo -e "\033[31m[警告] 未找到打包的 libusb_shared.so\033[0m"
     echo "--------------------------------------------------"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
@@ -415,4 +415,6 @@ echo ""
 
 if [ -z "${NO_PAUSE+set}" ]; then
     read -p "按任意键继续..."
+else
+    sleep 5s
 fi

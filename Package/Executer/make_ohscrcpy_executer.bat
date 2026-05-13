@@ -11,7 +11,7 @@ REM WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 REM See the License for the specific language governing permissions and
 REM limitations under the License.
 
-@cls
+::@cls
 @setlocal enabledelayedexpansion
 @chcp 936 >nul
 @echo off
@@ -56,7 +56,7 @@ if %errorlevel% neq 0 (
     echo -----------------------------------------
     echo [错误] 未找到Python，请先安装Python 3.7+
     echo -----------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -68,7 +68,7 @@ if %errorlevel% neq 0 (
         echo ---------------------------
         echo [错误] PyInstaller安装失败
         echo ---------------------------
-        pause
+        timeout /t 5
         exit /b 1
     )
     echo [成功] PyInstaller安装完成
@@ -85,7 +85,7 @@ if not exist main.py (
     echo ---------------------------------------------------
     echo [错误] 未找到 main.py，请确保该文件存在
     echo ---------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -93,7 +93,7 @@ if not exist core (
     echo ---------------------------------------------------
     echo [错误] 未找到模块目录 core
     echo ---------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -101,7 +101,7 @@ if not exist video (
     echo ---------------------------------------------------
     echo [错误] 未找到模块目录 video
     echo ---------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -109,7 +109,7 @@ if not exist gui (
     echo ---------------------------------------------------
     echo [错误] 未找到模块目录 gui
     echo ---------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -117,7 +117,7 @@ if not exist utils (
     echo ---------------------------------------------------
     echo [错误] 未找到模块目录 utils
     echo ---------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -125,7 +125,7 @@ if not exist ohscrcpy_server (
     echo ------------------------------------------------
     echo [警告] 未找到 ohscrcpy_server，请确保该文件存在
     echo ------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -133,7 +133,7 @@ if not exist HUAWEI\ohscrcpy_server (
     echo -------------------------------------------------------
     echo [警告] 未找到 HUAWEI\ohscrcpy_server，请确保该文件存在
     echo -------------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -141,7 +141,7 @@ if not exist ohscrcpy_server.cfg (
     echo ----------------------------------------------------
     echo [警告] 未找到 ohscrcpy_server.cfg，请确保该文件存在
     echo ----------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -149,7 +149,7 @@ if not exist app.ico (
     echo ----------------------------------------
     echo [警告] 未找到图标文件 app.ico
     echo ----------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -157,7 +157,7 @@ if not exist hdc\Windows\%ARCH%\hdc.exe (
     echo -----------------------------------------------------------
     echo [警告] 未找到 hdc\Windows\%ARCH%\hdc.exe，请确保该文件存在
     echo -----------------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -165,7 +165,7 @@ if not exist hdc\Windows\%ARCH%\libusb_shared.dll (
     echo ---------------------------------------------------------------------
     echo [警告] 未找到 hdc\Windows\%ARCH%\libusb_shared.dll，请确保该文件存在
     echo ---------------------------------------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -177,7 +177,7 @@ if %errorlevel% neq 0 (
     echo --------------------------
     echo [错误] 安装python依赖失败
     echo --------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 echo *****************************
@@ -192,7 +192,7 @@ if %errorlevel% neq 0 (
     echo ---------------------------
     echo [错误] PyInstaller打包失败
     echo ---------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 echo ****************************
@@ -204,7 +204,7 @@ if not exist dist\OHScrcpy.exe (
     echo ---------------------------
     echo [错误] 未生成 OHScrcpy.exe
     echo ---------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -337,4 +337,8 @@ if defined LOG_SCRIPTS (
 )
 echo   - %ZIP_NAME%
 echo.
-if not defined NO_PAUSE pause
+if not defined NO_PAUSE (
+    pause
+)else (
+    timeout /t 5
+)

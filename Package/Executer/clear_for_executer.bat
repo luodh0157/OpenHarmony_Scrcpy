@@ -28,7 +28,7 @@ REM   - scripts目录：日志管理脚本
 REM
 REM ================================================================================
 
-REM @cls
+::@cls
 @setlocal enabledelayedexpansion
 @chcp 936 >nul
 @echo off

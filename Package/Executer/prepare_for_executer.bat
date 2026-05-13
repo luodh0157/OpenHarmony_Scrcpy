@@ -36,7 +36,7 @@ REM   - make_ohscrcpy_executer.bat
 REM
 REM ================================================================================
 
-@cls
+::@cls
 @setlocal enabledelayedexpansion
 @chcp 936 >nul
 @echo off
@@ -61,7 +61,7 @@ if not exist "%PROJECT_ROOT%\Client\main.py" (
     echo -----------------------------------------
     echo [´íÎó] Î´ÕÒµ½ Client\main.py
     echo -----------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 
@@ -69,7 +69,7 @@ if not exist "%PROJECT_ROOT%\Client\core" (
     echo -----------------------------------------
     echo [´íÎó] Î´ÕÒµ½ Client\core Ä¿Â¼
     echo -----------------------------------------
-    pause
+    timeout /t 5
     exit /b 1
 )
 

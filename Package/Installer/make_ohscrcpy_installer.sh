@@ -56,25 +56,25 @@ echo "检查依赖..."
 DIST_DIR="dist/OHScrcpy"
 if [ ! -d "$DIST_DIR" ]; then
     echo "错误: 目录不存在: $DIST_DIR"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
 if ! command -v zip > /dev/null 2>&1; then
     echo "未找到zip命令，无法打包"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
 if [ ! -f "install_ohscrcpy.sh" ]; then
     echo "install_ohscrcpy.sh 文件不存在，无法打包"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 
 if [ ! -f "uninstall_ohscrcpy.sh" ]; then
     echo "uninstall_ohscrcpy.sh 文件不存在，无法打包"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 echo "检查依赖完成"
@@ -93,7 +93,7 @@ echo "打包完成"
 echo "验证打包结果..."
 if [ ! -f "${OUTPUT_DIR}/OHScrcpy_Setup_${OS_TYPE}_${ARCH}_${VERSION}.zip" ]; then
     echo "错误: 打包失败，未生成压缩包文件"
-    read -p "按任意键继续..."
+    sleep 5s
     exit 1
 fi
 echo "验证打包结果完成"
@@ -161,4 +161,6 @@ echo ""
 
 if [ -z "${NO_PAUSE+set}" ]; then
     read -p "按任意键继续..."
+else
+    sleep 5s
 fi

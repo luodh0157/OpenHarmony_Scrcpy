@@ -33,6 +33,7 @@
 # ================================================================================
 
 export TERM=xterm-256color
+export NO_PAUSE=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -47,16 +48,22 @@ get_version() {
 
 cleanup_all() {
     echo ""
+    echo "======================================="
     echo -e "\033[33m正在清理所有临时文件...\033[0m"
+    echo "======================================="
     echo ""
     
     cd "$SCRIPT_DIR/Executer"
     if [ -f "clear_for_executer.sh" ]; then
         chmod +x clear_for_executer.sh
         ./clear_for_executer.sh
+        echo "***************************************"
         echo "[完成] Executer目录清理完成"
+        echo "***************************************"
     else
+        echo --------------------------------------------------------------
         echo -e "\033[33m[警告] 未找到 clear_for_executer.sh，请手动清理！\033[0m"
+        echo --------------------------------------------------------------
     fi
     cd "$SCRIPT_DIR"
     
@@ -64,15 +71,19 @@ cleanup_all() {
     if [ -f "clear_for_installer.sh" ]; then
         chmod +x clear_for_installer.sh
         ./clear_for_installer.sh
+        echo "***************************************"
         echo "[完成] Installer目录清理完成"
+        echo "***************************************"
     else
+        echo ---------------------------------------------------------------
         echo -e "\033[33m[警告] 未找到 clear_for_installer.sh，请手动清理！\033[0m"
+        echo ---------------------------------------------------------------
     fi
     cd "$SCRIPT_DIR"
     
-    echo ""
+    echo "======================================="
     echo -e "\033[32m所有临时文件已清理完成！\033[0m"
-    echo ""
+    echo "======================================="
 }
 
 batch_build() {
@@ -85,42 +96,54 @@ batch_build() {
     SUCCESS_COUNT=0
     FAIL_COUNT=0
     
+    echo "+++++++++++++++++++++++++++++++++++++++"
     echo -e "\033[32m[1/2] 开始Executer打包...\033[0m"
+    echo "+++++++++++++++++++++++++++++++++++++++"
     echo ""
     if [ -f "$SCRIPT_DIR/build_executer.sh" ]; then
         chmod +x "$SCRIPT_DIR/build_executer.sh"
         "$SCRIPT_DIR/build_executer.sh"
         if [ $? -eq 0 ]; then
             SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-            echo ""
+            echo "***************************************"
             echo -e "\033[32mExecuter打包成功！\033[0m"
+            echo "***************************************"
         else
             FAIL_COUNT=$((FAIL_COUNT + 1))
-            echo ""
+            echo ---------------------------------------
             echo -e "\033[31mExecuter打包失败！\033[0m"
+            echo ---------------------------------------
         fi
     else
+        echo ----------------------------------------------
         echo -e "\033[31m[错误] 未找到 build_executer.sh\033[0m"
+        echo ----------------------------------------------
         FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
     
     echo ""
+    echo "+++++++++++++++++++++++++++++++++++++++"
     echo -e "\033[32m[2/2] 开始Installer打包...\033[0m"
+    echo "+++++++++++++++++++++++++++++++++++++++"
     echo ""
     if [ -f "$SCRIPT_DIR/build_installer.sh" ]; then
         chmod +x "$SCRIPT_DIR/build_installer.sh"
         "$SCRIPT_DIR/build_installer.sh"
         if [ $? -eq 0 ]; then
             SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-            echo ""
+            echo "***************************************"
             echo -e "\033[32mInstaller打包成功！\033[0m"
+            echo "***************************************"
         else
             FAIL_COUNT=$((FAIL_COUNT + 1))
-            echo ""
+            echo ---------------------------------------
             echo -e "\033[31mInstaller打包失败！\033[0m"
+            echo ---------------------------------------
         fi
     else
+        echo -------------------------------------------------
         echo -e "\033[31m[错误] 未找到 build_installer.sh\033[0m"
+        echo -------------------------------------------------
         FAIL_COUNT=$((FAIL_COUNT + 1))
     fi
     
@@ -143,9 +166,9 @@ batch_build() {
 
 show_menu() {
     clear
-    echo -e "\033[32m===================================== \033[0m"
-    echo -e "\033[32m  OpenHarmony OHScrcpy 一键打包工具  \033[0m"
-    echo -e "\033[32m===================================== \033[0m"
+    echo -e "\033[32m=========================================\033[0m"
+    echo -e "\033[32m    OpenHarmony OHScrcpy 一键打包工具    \033[0m"
+    echo -e "\033[32m=========================================\033[0m"
     echo ""
     echo "版本: $VERSION"
     echo ""
@@ -169,26 +192,34 @@ main() {
         case "$choice" in
             1)
                 echo ""
+                echo "======================================="
                 echo -e "\033[33m开始Executer打包...\033[0m"
+                echo "======================================="
                 echo ""
                 if [ -f "$SCRIPT_DIR/build_executer.sh" ]; then
                     chmod +x "$SCRIPT_DIR/build_executer.sh"
                     "$SCRIPT_DIR/build_executer.sh"
                 else
+                    echo ---------------------------------------------
                     echo -e "\033[31m[错误] 未找到 build_executer.sh\033[0m"
+                    echo ---------------------------------------------
                 fi
                 echo ""
                 read -p "按回车键继续..."
                 ;;
             2)
                 echo ""
+                echo "======================================="
                 echo -e "\033[33m开始Installer打包...\033[0m"
+                echo "======================================="
                 echo ""
                 if [ -f "$SCRIPT_DIR/build_installer.sh" ]; then
                     chmod +x "$SCRIPT_DIR/build_installer.sh"
                     "$SCRIPT_DIR/build_installer.sh"
                 else
+                    echo ----------------------------------------------
                     echo -e "\033[31m[错误] 未找到 build_installer.sh\033[0m"
+                    echo ----------------------------------------------
                 fi
                 echo ""
                 read -p "按回车键继续..."
@@ -203,14 +234,16 @@ main() {
                 ;;
             5)
                 echo ""
+                echo "======================================="
                 echo -e "\033[32m退出打包工具！\033[0m"
-                echo ""
+                echo "======================================="
                 exit 0
                 ;;
             *)
                 echo ""
+                echo "======================================="
                 echo -e "\033[31m无效选项，请重新选择！\033[0m"
-                echo ""
+                echo "======================================="
                 sleep 1
                 ;;
         esac

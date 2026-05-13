@@ -15,7 +15,7 @@ REM ============================================================================
 REM       OpenHarmony OHScrcpy 自动准备资源脚本 - Installer打包方式 (Windows)
 REM ================================================================================
 
-@cls
+::@cls
 @setlocal enabledelayedexpansion
 @chcp 936 >nul
 @echo off

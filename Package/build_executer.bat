@@ -15,7 +15,7 @@ REM ============================================================================
 REM       OpenHarmony OHScrcpy 一键打包脚本 - Executer方式 (Windows)
 REM ================================================================================
 
-@cls
+::@cls
 @setlocal enabledelayedexpansion
 @chcp 936 >nul
 @echo off
@@ -40,7 +40,9 @@ cd /d "%SCRIPT_DIR%\Executer"
 if exist clear_for_executer.bat (
     call clear_for_executer.bat
 ) else (
+    echo -------------------------------------------------------------
     echo [警告] 未找到 clear_for_executer.bat，请手动清理！
+    echo -------------------------------------------------------------
 )
 cd /d "%SCRIPT_DIR%"
 echo [完成] 自动清理完成
@@ -48,17 +50,23 @@ exit /b 1
 
 :main_start
 
+echo +++++++++++++++++++++++++++++++++++++++
 echo [步骤 1/5] 检查环境依赖...
+echo +++++++++++++++++++++++++++++++++++++++
 echo.
 
 where python >nul 2>nul
 if %errorlevel% neq 0 (
+    echo -------------------------------------------------------------
     echo [错误] 未找到Python，请先安装Python 3.7+
+    echo -------------------------------------------------------------
     goto :cleanup_on_error
 )
 
 if not exist "%PROJECT_ROOT%\Client\main.py" (
+    echo -------------------------------------------------------------
     echo [错误] 未找到项目源文件: Client\main.py
+    echo -------------------------------------------------------------
     goto :cleanup_on_error
 )
 
@@ -70,12 +78,16 @@ echo.
 echo [完成] 环境检查通过
 echo.
 
+echo +++++++++++++++++++++++++++++++++++++++
 echo [步骤 2/5] 准备打包资源...
+echo +++++++++++++++++++++++++++++++++++++++
 echo.
 
 cd /d "%SCRIPT_DIR%\Executer"
 if not exist prepare_for_executer.bat (
+    echo -------------------------------------------------------------
     echo [错误] 未找到 prepare_for_executer.bat
+    echo -------------------------------------------------------------
     goto :cleanup_on_error
 )
 
@@ -90,12 +102,16 @@ echo.
 echo [完成] 资源准备完成
 echo.
 
+echo +++++++++++++++++++++++++++++++++++++++
 echo [步骤 3/5] 执行PyInstaller打包...
+echo +++++++++++++++++++++++++++++++++++++++
 echo.
 
 cd /d "%SCRIPT_DIR%\Executer"
 if not exist make_ohscrcpy_executer.bat (
+    echo -------------------------------------------------------------
     echo [错误] 未找到 make_ohscrcpy_executer.bat
+    echo -------------------------------------------------------------
     goto :cleanup_on_error
 )
 
@@ -110,7 +126,9 @@ echo.
 echo [完成] PyInstaller打包完成
 echo.
 
+echo +++++++++++++++++++++++++++++++++++++++
 echo [步骤 4/5] 显示输出结果...
+echo +++++++++++++++++++++++++++++++++++++++
 echo.
 
 if defined PROCESSOR_ARCHITEW6432 (
@@ -132,21 +150,27 @@ if exist "%OUTPUT_DIR%" (
     echo 生成的文件：
     dir /b "%OUTPUT_DIR%" | findstr /i "OHScrcpy zip hash"
 ) else (
+    echo -------------------------------------------------------------
     echo [警告] 未找到输出目录
+    echo -------------------------------------------------------------
 )
 
 echo.
 echo [完成] 输出结果显示完成
 echo.
 
+echo +++++++++++++++++++++++++++++++++++++++
 echo [步骤 5/5] 清理临时资源文件...
+echo +++++++++++++++++++++++++++++++++++++++
 echo.
 
 cd /d "%SCRIPT_DIR%\Executer"
 if exist clear_for_executer.bat (
     call clear_for_executer.bat
 ) else (
+    echo -------------------------------------------------------------
     echo [警告] 未找到 clear_for_executer.bat，请手动清理！
+    echo -------------------------------------------------------------
 )
 cd /d "%SCRIPT_DIR%"
 
@@ -167,5 +191,9 @@ echo   运行 OHScrcpy.exe 开始投屏
 echo.
 echo 成功完成所有步骤！
 echo.
-pause
+if not defined NO_PAUSE (
+    pause
+) else (
+    timeout /t 5
+)
 exit /b 0
