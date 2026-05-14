@@ -22,7 +22,14 @@ echo ============================================================
 echo      OpenHarmony OHScrcpy 自动化构建脚本（Windows平台）     
 echo ============================================================
 
-set VERSION=v2.1.0
+REM 获取版本号（优先使用环境变量）
+if not defined VERSION (
+    call "%~dp0..\get_version.bat"
+    if not defined VERSION (
+        echo [警告] 未设置 VERSION 环境变量且未找到 get_version.bat，使用默认版本
+        set VERSION=v2.1.0
+    )
+)
 
 ::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
 if defined PROCESSOR_ARCHITEW6432 (

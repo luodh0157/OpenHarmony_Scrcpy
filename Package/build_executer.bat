@@ -30,7 +30,8 @@ echo.
 set NO_PAUSE=1
 set SCRIPT_DIR=%~dp0
 set PROJECT_ROOT=%SCRIPT_DIR%..
-set VERSION=v2.1.0
+call "%~dp0get_version.bat"
+if not defined VERSION set VERSION=v2.1.0
 
 goto :main_start
 

@@ -37,7 +37,7 @@
 
 export TERM=xterm-256color
 export NO_PAUSE=1
-clear
+#clear
 
 echo -e "\033[32m=================================================================\033[0m"
 echo -e "\033[32m     OpenHarmony OHScrcpy 一键打包 - Installer方式（Linux/Mac）   \033[0m"
@@ -47,7 +47,15 @@ echo ""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-VERSION="v2.1.0"
+# 获取版本号
+GET_VERSION_SCRIPT="$SCRIPT_DIR/get_version.sh"
+if [ -f "$GET_VERSION_SCRIPT" ]; then
+    chmod +x "$GET_VERSION_SCRIPT"
+    export VERSION=$("$GET_VERSION_SCRIPT")
+else
+    echo -e "\033[33m[警告] 未找到 get_version.sh\033[0m"
+    export VERSION="v2.1.0"
+fi
 
 cleanup_on_error() {
     echo -e "\033[31m[错误] 打包失败，正在自动清理临时文件...\033[0m"

@@ -19,7 +19,17 @@ echo "================================================================"
 echo "    OpenHarmony OHScrcpy 安装程序制作脚本（Linux/macOS平台）    "
 echo "================================================================"
 
-VERSION="v2.1.0"
+# 获取版本号（优先使用环境变量）
+if [ -z "$VERSION" ]; then
+    GET_VERSION_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../get_version.sh"
+    if [ -f "$GET_VERSION_SCRIPT" ]; then
+        chmod +x "$GET_VERSION_SCRIPT"
+        VERSION=$("$GET_VERSION_SCRIPT")
+    else
+        echo -e "\033[33m[警告] 未设置 VERSION 环境变量且未找到 get_version.sh，使用默认版本\033[0m"
+        VERSION="v2.1.0"
+    fi
+fi
 
 OS="$(uname -s)"
 case "${OS}" in

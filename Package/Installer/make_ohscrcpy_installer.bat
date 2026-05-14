@@ -23,7 +23,14 @@ echo     OpenHarmony OHScrcpy 安装程序制作脚本（Windows平台）
 echo ============================================================
 echo.
 
-set VERSION="v2.1.0"
+REM 获取版本号（优先使用环境变量）
+if not defined VERSION (
+    call "%~dp0..\get_version.bat"
+    if not defined VERSION (
+        echo [警告] 未设置 VERSION 环境变量且未找到 get_version.bat，使用默认版本
+        set VERSION=v2.1.0
+    )
+)
 
 ::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
 if defined PROCESSOR_ARCHITEW6432 (
@@ -108,7 +115,7 @@ if not exist docs\INSTALL.txt (
 if not exist output\Windows\%ARCH% mkdir output\Windows\%ARCH%
 
 echo [信息] 开始编译安装程序，请稍后...
-"!ISCC_PATH!" /Qp /O".\output\Windows\%ARCH%" /F"OHScrcpy_Setup_Windows_%ARCH%_%VERSION%" ohscrcpy_setup.iss
+"!ISCC_PATH!" /Qp /O".\output\Windows\%ARCH%" /F"OHScrcpy_Setup_Windows_%ARCH%_%VERSION%" /dAppVersion=%VERSION:~1% ohscrcpy_setup.iss
 if %errorlevel% neq 0 (
     echo [错误] 编译安装程序失败
     timeout /t 5

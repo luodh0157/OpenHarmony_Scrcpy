@@ -9,17 +9,42 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ==================== 测试阶段 ====================
   test:
     name: Run Tests
     uses: ./.github/workflows/test.yml
 
-  # ==================== Windows x64 - Executer 构建 ====================
-  build-windows-executer:
-    name: Build Windows Executer x64
+  # ==================== Executer 构建（Matrix）====================
+  build-executer:
+    name: Build Executer (${{ matrix.platform }}-${{ matrix.arch }})
     needs: test
-    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: Windows
+            arch: x64
+            ext: .exe
+          - os: ubuntu-latest
+            platform: Linux
+            arch: x64
+            ext: ''
+          - os: macos-latest
+            platform: macOS
+            arch: arm64
+            ext: ''
+          - os: macos-13
+            platform: macOS
+            arch: x64
+            ext: ''
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,216 +53,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: Client/requirements.txt
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r Client/requirements.txt
-          pip install pyinstaller
-
-      - name: Build Executer
-        run: |
-          cd Package
-          call build_executer.bat
-
-      - name: Test executable
-        run: |
-          $exePath = "Package\Executer\output\Windows\x64\OHScrcpy.exe"
-          if (Test-Path $exePath) {
-            Write-Host "Testing executable..."
-            & $exePath --help 2>&1 | Select-Object -First 10
-            Write-Host "Executable test completed"
-          } else {
-            Write-Error "Executable not found at $exePath"
-            exit 1
-          }
-
-      - name: Upload Windows Executer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: OHScrcpy-Executer-Windows-x64
-          path: Package/Executer/output/Windows/x64/
-          retention-days: 30
-          if-no-files-found: error
-
-  # ==================== Windows x64 - Installer 构建 ====================
-  build-windows-installer:
-    name: Build Windows Installer x64
-    needs: test
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Inno Setup
-        run: |
-          choco install innosetup -y
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r Client/requirements.txt
-          pip install pyinstaller
-
-      - name: Build Installer (skip pause in CI)
-        run: |
-          cd Package
-          # Set NO_PAUSE and call the script
-          $env:NO_PAUSE = "1"
-          # Skip the interactive pause step by directly calling sub-scripts
-          cd Installer
-          call prepare_for_installer.bat
-          call make_ohscrcpy_executer_onedir.bat
-          # Call ISCC directly to skip the pause in make_ohscrcpy_installer.bat
-          $arch = "x64"
-          $version = "v2.1.0"
-          ISCC.exe /Qp /O".\output\Windows\$arch" /F"OHScrcpy_Setup_Windows_$arch_$version" ohscrcpy_setup.iss
-          cd ..
-
-      - name: Test installer executable
-        run: |
-          $exePath = "Package\Installer\dist\OHScrcpy\OHScrcpy.exe"
-          if (Test-Path $exePath) {
-            Write-Host "Testing installer executable..."
-            & $exePath --help 2>&1 | Select-Object -First 10
-            Write-Host "Installer executable test completed"
-          } else {
-            Write-Error "Installer executable not found"
-            exit 1
-          }
-
-      - name: Upload Windows Installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: OHScrcpy-Installer-Windows-x64
-          path: Package/Installer/output/Windows/x64/
-          retention-days: 30
-          if-no-files-found: error
-
-  # ==================== Linux x64 - Executer 构建 ====================
-  build-linux-executer:
-    name: Build Linux Executer x64
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install system dependencies (FFmpeg for PyAV)
+      - name: Install system dependencies (Linux)
+        if: matrix.platform == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r Client/requirements.txt
-          pip install pyinstaller
-
-      - name: Build Executer
-        run: |
-          cd Package
-          chmod +x build_executer.sh
-          ./build_executer.sh
-
-      - name: Test executable
-        run: |
-          exePath="Package/Executer/output/Linux/x64/OHScrcpy"
-          if [ -f "$exePath" ]; then
-            echo "Testing executable..."
-            chmod +x "$exePath"
-            "$exePath" --help 2>&1 | head -10 || true
-            echo "Executable test completed"
-          else
-            echo "Error: Executable not found"
-            exit 1
-          fi
-
-      - name: Upload Linux Executer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: OHScrcpy-Executer-Linux-x64
-          path: Package/Executer/output/Linux/x64/
-          retention-days: 30
-          if-no-files-found: error
-
-  # ==================== Linux x64 - Installer 构建 ====================
-  build-linux-installer:
-    name: Build Linux Installer x64
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r Client/requirements.txt
-          pip install pyinstaller
-
-      - name: Build Installer
-        run: |
-          cd Package
-          chmod +x build_installer.sh
-          ./build_installer.sh
-
-      - name: Test installer executable
-        run: |
-          exePath="Package/Installer/dist/OHScrcpy/OHScrcpy"
-          if [ -f "$exePath" ]; then
-            echo "Testing installer executable..."
-            chmod +x "$exePath"
-            "$exePath" --help 2>&1 | head -10 || true
-            echo "Installer executable test completed"
-          else
-            echo "Error: Installer executable not found"
-            exit 1
-          fi
-
-      - name: Upload Linux Installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: OHScrcpy-Installer-Linux-x64
-          path: Package/Installer/output/Linux/x64/
-          retention-days: 30
-          if-no-files-found: error
-
-  # ==================== macOS arm64 - Executer 构建 ====================
-  build-macos-arm64-executer:
-    name: Build macOS Executer arm64
-    needs: test
-    runs-on: macos-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install FFmpeg
+      - name: Install FFmpeg (macOS)
+        if: matrix.platform == 'macOS'
         run: brew install ffmpeg
 
       - name: Install Python dependencies
@@ -247,6 +73,7 @@ jobs:
           pip install pyinstaller
 
       - name: Generate macOS icon (.icns)
+        if: matrix.platform == 'macOS'
         run: |
           cd Package/Executer
           python3 << 'EOF'
@@ -269,38 +96,69 @@ jobs:
           iconutil -c icns icon.iconset -o app.icns
           rm -rf icon.iconset icon_512.png
 
-      - name: Build Executer
+      - name: Build Executer (Windows)
+        if: matrix.platform == 'Windows'
+        shell: cmd
+        run: |
+          cd Package
+          call build_executer.bat
+
+      - name: Build Executer (Linux/macOS)
+        if: matrix.platform != 'Windows'
         run: |
           cd Package
           chmod +x build_executer.sh
           ./build_executer.sh
 
       - name: Test executable
+        shell: bash
         run: |
-          exePath="Package/Executer/output/macOS/arm64/OHScrcpy"
-          if [ -f "$exePath" ]; then
-            echo "Testing executable..."
-            chmod +x "$exePath"
-            "$exePath" --help 2>&1 | head -10 || true
+          EXE_PATH="Package/Executer/output/${{ matrix.platform }}/${{ matrix.arch }}/OHScrcpy${{ matrix.ext }}"
+          if [ -f "$EXE_PATH" ]; then
+            echo "Testing executable at: $EXE_PATH"
+            chmod +x "$EXE_PATH" 2>/dev/null || true
+            "$EXE_PATH" --help 2>&1 | head -10 || true
             echo "Executable test completed"
           else
-            echo "Error: Executable not found"
+            echo "::error::Executable not found at $EXE_PATH"
+            ls -la "Package/Executer/output/${{ matrix.platform }}/${{ matrix.arch }}/" || true
             exit 1
           fi
 
-      - name: Upload macOS arm64 Executer artifact
+      - name: Upload Executer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OHScrcpy-Executer-macOS-arm64
-          path: Package/Executer/output/macOS/arm64/
+          name: OHScrcpy-Executer-${{ matrix.platform }}-${{ matrix.arch }}
+          path: Package/Executer/output/${{ matrix.platform }}/${{ matrix.arch }}/
           retention-days: 30
           if-no-files-found: error
 
-  # ==================== macOS arm64 - Installer 构建 ====================
-  build-macos-arm64-installer:
-    name: Build macOS Installer arm64
+  # ==================== Installer 构建（Matrix）====================
+  build-installer:
+    name: Build Installer (${{ matrix.platform }}-${{ matrix.arch }})
     needs: test
-    runs-on: macos-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: Windows
+            arch: x64
+            ext: .exe
+          - os: ubuntu-latest
+            platform: Linux
+            arch: x64
+            ext: ''
+          - os: macos-latest
+            platform: macOS
+            arch: arm64
+            ext: ''
+          - os: macos-13
+            platform: macOS
+            arch: x64
+            ext: ''
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -309,87 +167,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: Client/requirements.txt
 
-      - name: Install FFmpeg
+      - name: Install system dependencies (Linux)
+        if: matrix.platform == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev
+
+      - name: Install FFmpeg (macOS)
+        if: matrix.platform == 'macOS'
         run: brew install ffmpeg
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r Client/requirements.txt
-          pip install pyinstaller
-
-      - name: Generate macOS icon (.icns) for Installer
-        run: |
-          cd Package/Installer
-          cp ../Executer/app.ico resources/app.ico || true
-          python3 << 'EOF'
-          from PIL import Image
-          import os
-          icon_path = 'resources/app.ico'
-          if os.path.exists(icon_path):
-            img = Image.open(icon_path)
-            img.save('icon_512.png', 'PNG')
-          EOF
-          if [ -f icon_512.png ]; then
-            mkdir -p icon.iconset
-            sips -z 16 16 icon_512.png --out icon.iconset/icon_16x16.png
-            sips -z 32 32 icon_512.png --out icon.iconset/icon_16x16@2x.png
-            sips -z 32 32 icon_512.png --out icon.iconset/icon_32x32.png
-            sips -z 64 64 icon_512.png --out icon.iconset/icon_32x32@2x.png
-            sips -z 128 128 icon_512.png --out icon.iconset/icon_128x128.png
-            sips -z 256 256 icon_512.png --out icon.iconset/icon_128x128@2x.png
-            sips -z 256 256 icon_512.png --out icon.iconset/icon_256x256.png
-            sips -z 512 512 icon_512.png --out icon.iconset/icon_256x256@2x.png
-            sips -z 512 512 icon_512.png --out icon.iconset/icon_512x512.png
-            cp icon_512.png icon.iconset/icon_512x512@2x.png
-            iconutil -c icns icon.iconset -o resources/app.icns
-            rm -rf icon.iconset icon_512.png
-          fi
-
-      - name: Build Installer
-        run: |
-          cd Package
-          chmod +x build_installer.sh
-          ./build_installer.sh
-
-      - name: Test installer executable
-        run: |
-          exePath="Package/Installer/dist/OHScrcpy/OHScrcpy"
-          if [ -f "$exePath" ]; then
-            echo "Testing installer executable..."
-            chmod +x "$exePath"
-            "$exePath" --help 2>&1 | head -10 || true
-            echo "Installer executable test completed"
-          else
-            echo "Error: Installer executable not found"
-            exit 1
-          fi
-
-      - name: Upload macOS arm64 Installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: OHScrcpy-Installer-macOS-arm64
-          path: Package/Installer/output/macOS/arm64/
-          retention-days: 30
-          if-no-files-found: error
-
-  # ==================== macOS x64 - Executer 构建 ====================
-  build-macos-x64-executer:
-    name: Build macOS Executer x64
-    needs: test
-    runs-on: macos-13
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install FFmpeg
-        run: brew install ffmpeg
+      - name: Install Inno Setup (Windows)
+        if: matrix.platform == 'Windows'
+        run: choco install innosetup -y
 
       - name: Install Python dependencies
         run: |
@@ -398,78 +191,7 @@ jobs:
           pip install pyinstaller
 
       - name: Generate macOS icon (.icns)
-        run: |
-          cd Package/Executer
-          python3 << 'EOF'
-          from PIL import Image
-          img = Image.open('app.ico')
-          img.save('icon_512.png', 'PNG')
-          EOF
-          mkdir -p icon.iconset
-          sips -z 16 16 icon_512.png --out icon.iconset/icon_16x16.png
-          sips -z 32 32 icon_512.png --out icon.iconset/icon_16x16@2x.png
-          sips -z 32 32 icon_512.png --out icon.iconset/icon_32x32.png
-          sips -z 64 64 icon_512.png --out icon.iconset/icon_32x32@2x.png
-          sips -z 128 128 icon_512.png --out icon.iconset/icon_128x128.png
-          sips -z 256 256 icon_512.png --out icon.iconset/icon_128x128@2x.png
-          sips -z 256 256 icon_512.png --out icon.iconset/icon_256x256.png
-          sips -z 512 512 icon_512.png --out icon.iconset/icon_256x256@2x.png
-          sips -z 512 512 icon_512.png --out icon.iconset/icon_512x512.png
-          cp icon_512.png icon.iconset/icon_512x512@2x.png
-          iconutil -c icns icon.iconset -o app.icns
-          rm -rf icon.iconset icon_512.png
-
-      - name: Build Executer
-        run: |
-          cd Package
-          chmod +x build_executer.sh
-          ./build_executer.sh
-
-      - name: Test executable
-        run: |
-          exePath="Package/Executer/output/macOS/x64/OHScrcpy"
-          if [ -f "$exePath" ]; then
-            echo "Testing executable..."
-            chmod +x "$exePath"
-            "$exePath" --help 2>&1 | head -10 || true
-            echo "Executable test completed"
-          else
-            echo "Error: Executable not found"
-            exit 1
-          fi
-
-      - name: Upload macOS x64 Executer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: OHScrcpy-Executer-macOS-x64
-          path: Package/Executer/output/macOS/x64/
-          retention-days: 30
-          if-no-files-found: error
-
-  # ==================== macOS x64 - Installer 构建 ====================
-  build-macos-x64-installer:
-    name: Build macOS Installer x64
-    needs: test
-    runs-on: macos-13
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install FFmpeg
-        run: brew install ffmpeg
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r Client/requirements.txt
-          pip install pyinstaller
-
-      - name: Generate macOS icon (.icns) for Installer
+        if: matrix.platform == 'macOS'
         run: |
           cd Package/Installer
           cp ../Executer/app.ico resources/app.ico || true
@@ -497,30 +219,40 @@ jobs:
             rm -rf icon.iconset icon_512.png
           fi
 
-      - name: Build Installer
+      - name: Build Installer (Windows)
+        if: matrix.platform == 'Windows'
+        shell: cmd
+        run: |
+          cd Package
+          call build_installer.bat
+
+      - name: Build Installer (Linux/macOS)
+        if: matrix.platform != 'Windows'
         run: |
           cd Package
           chmod +x build_installer.sh
           ./build_installer.sh
 
       - name: Test installer executable
+        shell: bash
         run: |
-          exePath="Package/Installer/dist/OHScrcpy/OHScrcpy"
-          if [ -f "$exePath" ]; then
-            echo "Testing installer executable..."
-            chmod +x "$exePath"
-            "$exePath" --help 2>&1 | head -10 || true
+          EXE_PATH="Package/Installer/dist/OHScrcpy/OHScrcpy${{ matrix.ext }}"
+          if [ -f "$EXE_PATH" ]; then
+            echo "Testing installer executable at: $EXE_PATH"
+            chmod +x "$EXE_PATH" 2>/dev/null || true
+            "$EXE_PATH" --help 2>&1 | head -10 || true
             echo "Installer executable test completed"
           else
-            echo "Error: Installer executable not found"
+            echo "::error::Installer executable not found at $EXE_PATH"
+            ls -la "Package/Installer/dist/OHScrcpy/" || true
             exit 1
           fi
 
-      - name: Upload macOS x64 Installer artifact
+      - name: Upload Installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OHScrcpy-Installer-macOS-x64
-          path: Package/Installer/output/macOS/x64/
+          name: OHScrcpy-Installer-${{ matrix.platform }}-${{ matrix.arch }}
+          path: Package/Installer/output/${{ matrix.platform }}/${{ matrix.arch }}/
           retention-days: 30
           if-no-files-found: error
 
@@ -528,72 +260,25 @@ jobs:
   create-release:
     name: Create GitHub Release
     needs:
-      - build-windows-executer
-      - build-windows-installer
-      - build-linux-executer
-      - build-linux-installer
-      - build-macos-arm64-executer
-      - build-macos-arm64-installer
-      - build-macos-x64-executer
-      - build-macos-x64-installer
+      - build-executer
+      - build-installer
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts/
           merge-multiple: false
 
-      - name: Prepare release files
-        run: |
-          echo "Preparing release files..."
-          find release-artifacts -type f \( -name "*.zip" -o -name "*.exe" \) | head -20
-
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: OpenHarmony Scrcpy ${{ github.ref_name }}
-          body: |
-            ## OpenHarmony Scrcpy ${{ github.ref_name }}
-            
-            ### Downloads
-            
-            | Type | Platform | Architecture | File |
-            |------|----------|-------------|------|
-            | Executer | Windows | x64 | `OHScrcpy_Exec_Windows_x64_*.zip` |
-            | Executer | Linux | x64 | `OHScrcpy_Exec_Linux_x64_*.zip` |
-            | Executer | macOS | arm64 (M1/M2/M3) | `OHScrcpy_Exec_macOS_arm64_*.zip` |
-            | Executer | macOS | x64 (Intel) | `OHScrcpy_Exec_macOS_x64_*.zip` |
-            | Installer | Windows | x64 | `OHScrcpy_Setup_Windows_x64_*.exe` |
-            | Installer | Linux | x64 | `OHScrcpy_Setup_Linux_x64_*.zip` |
-            | Installer | macOS | arm64 | `OHScrcpy_Setup_macOS_arm64_*.zip` |
-            | Installer | macOS | x64 | `OHScrcpy_Setup_macOS_x64_*.zip` |
-            
-            ### Executer (单文件)
-            
-            Portable executable, no installation required:
-            1. Download and extract the ZIP
-            2. Run `OHScrcpy` directly
-            
-            ### Installer (安装包)
-            
-            Installation required:
-            1. Windows: Double-click `OHScrcpy_Setup_*.exe`
-            2. Linux/macOS: Extract ZIP, run `install_ohscrcpy.sh`
-            
-            ### Features
-            
-            - OpenHarmony device screen mirroring
-            - Support rk3568 / rk3588 / HarmonyOS devices
-            - Real-time H.264/H.265 video streaming
-            
           files: |
             release-artifacts/**/*
           draft: false
@@ -601,3 +286,32 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==================== 失败通知 ====================
+  notify-on-failure:
+    name: Notify on CI Failure
+    needs: [build-executer, build-installer]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create issue on failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `CI Failed: ${context.workflow} - ${context.ref}`,
+              body: `
+                ## CI Build Failed
+
+                **Workflow**: ${context.workflow}
+                **Branch/Tag**: ${context.ref}
+                **Run URL**: ${context.serverUrl}/${context.repository}/actions/runs/${context.runId}
+                **Triggered by**: ${context.actor}
+
+                Please investigate the failure.
+              `,
+              labels: ['ci-failed', 'automated']
+            })
