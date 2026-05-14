@@ -23,7 +23,7 @@ REM ============================================================================
 title OpenHarmony OHScrcpy 一键打包 - Executer方式
 color 0a
 echo ================================================================
-echo      OpenHarmony OHScrcpy 一键打包 - Executer方式（Windows）
+echo      OpenHarmony OHScrcpy 一键打包 - Executer方式（Windows）    
 echo ================================================================
 echo.
 
@@ -195,6 +195,6 @@ echo.
 if not defined NO_PAUSE (
     pause
 ) else (
-    timeout /t 5
+    timeout /t 5 <nul
 )
 exit /b 0

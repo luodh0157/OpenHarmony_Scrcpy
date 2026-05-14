@@ -180,18 +180,22 @@ jobs:
           chmod +x build_installer.sh
           ./build_installer.sh
 
-      - name: Test installer executable
+      - name: Test installer output
         shell: bash
         run: |
-          EXE_PATH="Package/Installer/dist/OHScrcpy/OHScrcpy${{ matrix.ext }}"
-          if [ -f "$EXE_PATH" ]; then
-            echo "Testing installer executable at: $EXE_PATH"
-            chmod +x "$EXE_PATH" 2>/dev/null || true
-            "$EXE_PATH" --help 2>&1 | head -10 || true
-            echo "Installer executable test completed"
+          OUTPUT_DIR="Package/Installer/output/${{ matrix.platform }}/${{ matrix.arch }}"
+          if [ -d "$OUTPUT_DIR" ]; then
+            echo "Checking installer output at: $OUTPUT_DIR"
+            ls -la "$OUTPUT_DIR"
+            ZIP_COUNT=$(find "$OUTPUT_DIR" -name "*.zip" -o -name "*.exe" | wc -l)
+            if [ "$ZIP_COUNT" -gt 0 ]; then
+              echo "Installer package found"
+            else
+              echo "::error::No installer package found in $OUTPUT_DIR"
+              exit 1
+            fi
           else
-            echo "::error::Installer executable not found at $EXE_PATH"
-            ls -la "Package/Installer/dist/OHScrcpy/" || true
+            echo "::error::Output directory not found: $OUTPUT_DIR"
             exit 1
           fi
 

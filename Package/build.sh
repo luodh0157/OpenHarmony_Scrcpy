@@ -38,14 +38,6 @@ export NO_PAUSE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-VERSION="v2.1.0"
-
-get_version() {
-    if [ -f "$PROJECT_ROOT/Client/core/constants.py" ]; then
-        VERSION=$(grep "VERSION = " "$PROJECT_ROOT/Client/core/constants.py" | cut -d'"' -f2)
-    fi
-}
-
 cleanup_all() {
     echo ""
     echo "======================================="
@@ -170,8 +162,6 @@ show_menu() {
     echo -e "\033[32m    OpenHarmony OHScrcpy 一键打包工具    \033[0m"
     echo -e "\033[32m=========================================\033[0m"
     echo ""
-    echo "版本: $VERSION"
-    echo ""
     echo "请选择打包方式："
     echo ""
     echo "  1. Executer (单文件可执行程序)"
@@ -183,8 +173,6 @@ show_menu() {
 }
 
 main() {
-    get_version
-    
     while true; do
         show_menu
         read -p "请输入选项 [1-5]: " choice

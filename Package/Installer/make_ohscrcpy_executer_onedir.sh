@@ -171,9 +171,16 @@ if [ ! -f "hdc/${OS_NAME}/${ARCH}/hdc" ]; then
     exit 1
 fi
 
-if [ ! -f "hdc/${OS_NAME}/${ARCH}/libusb_shared.so" ]; then
+# macOS uses .dylib, Linux uses .so
+if [ "${OS_TYPE}" = "macOS" ]; then
+    LIBUSB_NAME="libusb_shared.dylib"
+else
+    LIBUSB_NAME="libusb_shared.so"
+fi
+
+if [ ! -f "hdc/${OS_NAME}/${ARCH}/${LIBUSB_NAME}" ]; then
     echo "------------------------------------------------------------------------------------"
-    echo -e "\033[33m[警告] 未找到 hdc/${OS_NAME}/${ARCH}/libusb_shared.so，请确保该文件存在\033[0m"
+    echo -e "\033[33m[警告] 未找到 hdc/${OS_NAME}/${ARCH}/${LIBUSB_NAME}，请确保该文件存在\033[0m"
     echo "------------------------------------------------------------------------------------"
     sleep 5s
     exit 1
@@ -254,8 +261,8 @@ if [ -f "hdc/${OS_NAME}/${ARCH}/hdc" ]; then
     PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"hdc/${OS_NAME}/${ARCH}/hdc:.\""
 fi
 
-if [ -f "hdc/${OS_NAME}/${ARCH}/libusb_shared.so" ]; then
-    PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"hdc/${OS_NAME}/${ARCH}/libusb_shared.so:.\""
+if [ -f "hdc/${OS_NAME}/${ARCH}/${LIBUSB_NAME}" ]; then
+    PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"hdc/${OS_NAME}/${ARCH}/${LIBUSB_NAME}:.\""
 fi
 
 if [ -f "${ICON_FILE}" ]; then
@@ -322,9 +329,9 @@ if [ ! -f "dist/OHScrcpy/_internal/hdc" ]; then
     exit 1
 fi
 
-if [ ! -f "dist/OHScrcpy/_internal/libusb_shared.so" ]; then
+if [ ! -f "dist/OHScrcpy/_internal/${LIBUSB_NAME}" ]; then
     echo "--------------------------------------------------"
-    echo -e "\033[31m[警告] 未找到打包的 libusb_shared.so\033[0m"
+    echo -e "\033[31m[警告] 未找到打包的 ${LIBUSB_NAME}\033[0m"
     echo "--------------------------------------------------"
     sleep 5s
     exit 1

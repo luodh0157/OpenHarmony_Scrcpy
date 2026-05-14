@@ -68,7 +68,7 @@ if %errorlevel% neq 0 (
     echo   1. 下载Inno Setup, https://jrsoftware.org/isdl.php
     echo   2. 安装Inno Setup, 选择"Install Inno Setup Preprocessor"
     echo   3. 将Inno Setup安装目录配置到系统环境变量Path中
-    timeout /t 5
+    timeout /t 5 <nul
     exit /b 1
 )
 
@@ -79,7 +79,7 @@ for /f "delims=" %%a in ('where ISCC 2^>nul') do (
 
 :not_found_iscc
 echo [错误] 未找到 Inno Setup 编译器（ISCC），请确认已安装并添加至 PATH。
-timeout /t 5
+timeout /t 5 <nul
 exit /b 1
 
 :found_iscc
@@ -88,27 +88,27 @@ echo [信息] 找到Inno Setup编译器："!ISCC_PATH!"
 echo [信息] 检查必要文件...
 if not exist ohscrcpy_setup.iss (
     echo [错误] 未找到 ohscrcpy_setup.iss 配置文件
-    timeout /t 5
+    timeout /t 5 <nul
     exit /b 1
 )
 
 if not exist dist\OHScrcpy\OHScrcpy.exe (
     echo [错误] 未找到OHScrcpy.exe程序文件
     echo 请先运行 make_ohscrcpy_executer_onedir.bat 进行打包
-    timeout /t 5
+    timeout /t 5 <nul
     exit /b 1
 )
 
 echo [信息] 检查文档文件...
 if not exist docs\LICENSE.txt (
     echo [警告] 未找到 docs\LICENSE.txt
-    timeout /t 5
+    timeout /t 5 <nul
     exit /b 1
 )
 
 if not exist docs\INSTALL.txt (
     echo [警告] 未找到 docs\INSTALL.txt
-    timeout /t 5
+    timeout /t 5 <nul
     exit /b 1
 )
 
@@ -118,7 +118,7 @@ echo [信息] 开始编译安装程序，请稍后...
 "!ISCC_PATH!" /Qp /O".\output\Windows\%ARCH%" /F"OHScrcpy_Setup_Windows_%ARCH%_%VERSION%" /dAppVersion=%VERSION:~1% ohscrcpy_setup.iss
 if %errorlevel% neq 0 (
     echo [错误] 编译安装程序失败
-    timeout /t 5
+    timeout /t 5 <nul
     exit /b 1
 )
 
@@ -128,7 +128,7 @@ for %%f in (output\Windows\%ARCH%\*.exe) do set INSTALLER=%%f
 
 if "%INSTALLER%"=="" (
     echo [错误] 未生成安装程序
-    timeout /t 5
+    timeout /t 5 <nul
     exit /b 1
 )
 
@@ -189,5 +189,5 @@ echo.
 if not defined NO_PAUSE (
     pause
 ) else (
-    timeout /t 5
+    timeout /t 5 <nul
 )

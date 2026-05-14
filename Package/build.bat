@@ -25,16 +25,13 @@ color 0a
 
 set SCRIPT_DIR=%~dp0
 set PROJECT_ROOT=%SCRIPT_DIR%..
-set VERSION=v2.1.0
 
 :main_menu
 
 cls
-echo =========================================
-echo     OpenHarmony OHScrcpy 一键打包工具    
-echo =========================================
-echo.
-echo 版本：%VERSION%
+echo =================================================
+echo         OpenHarmony OHScrcpy 一键打包工具        
+echo =================================================
 echo.
 echo 请选择打包方式：
 echo.

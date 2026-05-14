@@ -7,44 +7,46 @@ on:
       - 'v*'
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build-executer:
     runs-on: euleros-2.10.1
     steps:
       - uses: checkout-action@0.0.1
-      
+
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
           python-version: '3.11'
-      
+
       - name: Install system dependencies
         run: |
-          yum install -y ffmpeg ffmpeg-devel || true
+          yum install -y ffmpeg ffmpeg-devel
           pip install --upgrade pip
           pip install -r repo_workspace/Client/requirements.txt
           pip install pyinstaller
-      
+
       - name: Build Executer
         run: |
           cd repo_workspace/Package
           chmod +x build_executer.sh
           ./build_executer.sh
-      
+
       - name: Test executable
         run: |
           exePath="repo_workspace/Package/Executer/output/Linux/x64/OHScrcpy"
           if [ -f "$exePath" ]; then
-            echo "Testing executable..."
+            echo "Testing executable at: $exePath"
             chmod +x "$exePath"
             "$exePath" --help 2>&1 | head -10 || true
             echo "Executable test completed"
           else
-            echo "Error: Executable not found"
+            echo "Error: Executable not found at $exePath"
+            ls -la "repo_workspace/Package/Executer/output/Linux/x64/" || true
             exit 1
           fi
-      
+
       - name: Upload Executer artifact
         uses: upload-artifact@0.0.1
         with:
@@ -56,38 +58,43 @@ jobs:
     runs-on: euleros-2.10.1
     steps:
       - uses: checkout-action@0.0.1
-      
+
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
           python-version: '3.11'
-      
+
       - name: Install system dependencies
         run: |
-          yum install -y ffmpeg ffmpeg-devel zip || true
+          yum install -y ffmpeg ffmpeg-devel zip
           pip install --upgrade pip
           pip install -r repo_workspace/Client/requirements.txt
           pip install pyinstaller
-      
+
       - name: Build Installer
         run: |
           cd repo_workspace/Package
           chmod +x build_installer.sh
           ./build_installer.sh
-      
-      - name: Test installer executable
+
+      - name: Test installer output
         run: |
-          exePath="repo_workspace/Package/Installer/dist/OHScrcpy/OHScrcpy"
-          if [ -f "$exePath" ]; then
-            echo "Testing installer executable..."
-            chmod +x "$exePath"
-            "$exePath" --help 2>&1 | head -10 || true
-            echo "Installer executable test completed"
+          outputDir="repo_workspace/Package/Installer/output/Linux/x64"
+          if [ -d "$outputDir" ]; then
+            echo "Checking installer output at: $outputDir"
+            ls -la "$outputDir"
+            zipCount=$(find "$outputDir" -name "*.zip" | wc -l)
+            if [ "$zipCount" -gt 0 ]; then
+              echo "Installer package found"
+            else
+              echo "Error: No installer package found in $outputDir"
+              exit 1
+            fi
           else
-            echo "Error: Installer executable not found"
+            echo "Error: Output directory not found: $outputDir"
             exit 1
           fi
-      
+
       - name: Upload Installer artifact
         uses: upload-artifact@0.0.1
         with:

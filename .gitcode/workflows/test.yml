@@ -11,21 +11,29 @@ jobs:
     runs-on: euleros-2.10.1
     steps:
       - uses: checkout-action@0.0.1
-      
+
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
           python-version: '3.11'
-      
-      - name: Install dependencies
+
+      - name: Install system dependencies (FFmpeg for PyAV)
+        run: |
+          yum install -y ffmpeg ffmpeg-devel
+
+      - name: Install test dependencies
         run: |
           cd repo_workspace
           pip install --upgrade pip
+          pip install -r tests/requirements-test.txt
           pip install -r Client/requirements.txt
-          pip install pytest mypy
-      
-      - name: Run tests
+
+      - name: Run pytest with coverage
         run: |
           cd repo_workspace
-          pytest tests/ -v
-          mypy Client/ --ignore-missing-imports || true
+          pytest tests/ -v --tb=short --cov=Client --cov-report=term-missing
+
+      - name: Run type check (mypy)
+        run: |
+          cd repo_workspace
+          mypy Client/ --ignore-missing-imports --no-error-summary || true
