@@ -88,7 +88,7 @@ UsePreviousLanguage=yes
 ; --- 语言设置 ---
 [Languages]
 ; 简体中文
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "source:resources\ChineseSimplified.isl"
 
 ; --- 自定义消息（可选） ---
 [Messages]
