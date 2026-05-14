@@ -72,30 +72,6 @@ jobs:
           pip install -r Client/requirements.txt
           pip install pyinstaller
 
-      - name: Generate macOS icon (.icns)
-        if: matrix.platform == 'macOS'
-        run: |
-          cd Package/Executer
-          python3 << 'EOF'
-          from PIL import Image
-          img = Image.open('app.ico')
-          img.save('icon_512.png', 'PNG')
-          print(f"Extracted icon size: {img.size}")
-          EOF
-          mkdir -p icon.iconset
-          sips -z 16 16     icon_512.png --out icon.iconset/icon_16x16.png
-          sips -z 32 32     icon_512.png --out icon.iconset/icon_16x16@2x.png
-          sips -z 32 32     icon_512.png --out icon.iconset/icon_32x32.png
-          sips -z 64 64     icon_512.png --out icon.iconset/icon_32x32@2x.png
-          sips -z 128 128   icon_512.png --out icon.iconset/icon_128x128.png
-          sips -z 256 256   icon_512.png --out icon.iconset/icon_128x128@2x.png
-          sips -z 256 256   icon_512.png --out icon.iconset/icon_256x256.png
-          sips -z 512 512   icon_512.png --out icon.iconset/icon_256x256@2x.png
-          sips -z 512 512   icon_512.png --out icon.iconset/icon_512x512.png
-          cp icon_512.png icon.iconset/icon_512x512@2x.png
-          iconutil -c icns icon.iconset -o app.icns
-          rm -rf icon.iconset icon_512.png
-
       - name: Build Executer (Windows)
         if: matrix.platform == 'Windows'
         shell: cmd
@@ -189,35 +165,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
-
-      - name: Generate macOS icon (.icns)
-        if: matrix.platform == 'macOS'
-        run: |
-          cd Package/Installer
-          cp ../Executer/app.ico resources/app.ico || true
-          python3 << 'EOF'
-          from PIL import Image
-          import os
-          icon_path = 'resources/app.ico'
-          if os.path.exists(icon_path):
-            img = Image.open(icon_path)
-            img.save('icon_512.png', 'PNG')
-          EOF
-          if [ -f icon_512.png ]; then
-            mkdir -p icon.iconset
-            sips -z 16 16 icon_512.png --out icon.iconset/icon_16x16.png
-            sips -z 32 32 icon_512.png --out icon.iconset/icon_16x16@2x.png
-            sips -z 32 32 icon_512.png --out icon.iconset/icon_32x32.png
-            sips -z 64 64 icon_512.png --out icon.iconset/icon_32x32@2x.png
-            sips -z 128 128 icon_512.png --out icon.iconset/icon_128x128.png
-            sips -z 256 256 icon_512.png --out icon.iconset/icon_128x128@2x.png
-            sips -z 256 256 icon_512.png --out icon.iconset/icon_256x256.png
-            sips -z 512 512 icon_512.png --out icon.iconset/icon_256x256@2x.png
-            sips -z 512 512 icon_512.png --out icon.iconset/icon_512x512.png
-            cp icon_512.png icon.iconset/icon_512x512@2x.png
-            iconutil -c icns icon.iconset -o resources/app.icns
-            rm -rf icon.iconset icon_512.png
-          fi
 
       - name: Build Installer (Windows)
         if: matrix.platform == 'Windows'

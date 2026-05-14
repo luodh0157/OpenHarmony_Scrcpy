@@ -188,7 +188,7 @@ if [ ! -f "resources/app.ico" ] && [ ! -f "resources/app.icns" ]; then
 fi
 
 ICON_FILE="resources/app.ico"
-if [ "${OS_TYPE}" = "macOS" ] && [ -f "app.icns" ]; then
+if [ "${OS_TYPE}" = "macOS" ] && [ -f "resources/app.icns" ]; then
     ICON_FILE="resources/app.icns"
 fi
 echo "[信息] 使用图标文件: ${ICON_FILE}"

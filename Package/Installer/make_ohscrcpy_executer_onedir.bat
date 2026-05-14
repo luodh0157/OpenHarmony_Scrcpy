@@ -167,9 +167,9 @@ if not exist ohscrcpy_server.cfg (
     exit /b 1
 )
 
-if not exist resources\app.ico (
+if not exist resources\app.ico if not exist resources\app.icns (
     echo ----------------------------------------
-    echo [警告] 未找到图标文件 resources\app.ico
+    echo [警告] 未找到图标文件 resources\app.ico 或 resources\app.icns
     echo ----------------------------------------
     timeout /t 5
     exit /b 1
