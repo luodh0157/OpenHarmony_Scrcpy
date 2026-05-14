@@ -195,6 +195,6 @@ echo.
 if not defined NO_PAUSE (
     pause
 ) else (
-    timeout /t 5 <nul
+    ping 127.0.0.1 -n 6 >nul
 )
 exit /b 0

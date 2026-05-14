@@ -53,7 +53,7 @@ if "%choice%"=="5" goto :exit_tool
 echo.
 echo 无效选项，请重新选择！
 echo.
-timeout /t 2 >nul
+ping 127.0.0.1 -n 3 >nul
 goto :main_menu
 
 :build_executer

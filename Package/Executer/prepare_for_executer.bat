@@ -61,7 +61,7 @@ if not exist "%PROJECT_ROOT%\Client\main.py" (
     echo -----------------------------------------
     echo [´íÎó] Î´ÕÒµ½ Client\main.py
     echo -----------------------------------------
-    timeout /t 5 <nul
+    ping 127.0.0.1 -n 6 >nul
     exit /b 1
 )
 
@@ -69,7 +69,7 @@ if not exist "%PROJECT_ROOT%\Client\core" (
     echo -----------------------------------------
     echo [´íÎó] Î´ÕÒµ½ Client\core Ä¿Â¼
     echo -----------------------------------------
-    timeout /t 5 <nul
+    ping 127.0.0.1 -n 6 >nul
     exit /b 1
 )
 
