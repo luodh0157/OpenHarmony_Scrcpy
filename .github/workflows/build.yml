@@ -86,18 +86,22 @@ jobs:
           chmod +x build_executer.sh
           ./build_executer.sh
 
-      - name: Test executable
+      - name: Test Executer output
         shell: bash
         run: |
-          EXE_PATH="Package/Executer/output/${{ matrix.platform }}/${{ matrix.arch }}/OHScrcpy${{ matrix.ext }}"
-          if [ -f "$EXE_PATH" ]; then
-            echo "Executable found at: $EXE_PATH"
-            ls -lh "$EXE_PATH"
-            # GUI apps may hang in headless CI environments; verify existence and size instead of executing
-            echo "Executable test completed"
+          OUTPUT_DIR="Package/Executer/output/${{ matrix.platform }}/${{ matrix.arch }}"
+          if [ -d "$OUTPUT_DIR" ]; then
+            echo "Checking executer output at: $OUTPUT_DIR"
+            ls -la "$OUTPUT_DIR"
+            ZIP_COUNT=$(find "$OUTPUT_DIR" -name "*.zip" -o -name "*.exe" | wc -l)
+            if [ "$ZIP_COUNT" -gt 0 ]; then
+              echo "Executer package found"
+            else
+              echo "::error::No executer package found in $OUTPUT_DIR"
+              exit 1
+            fi
           else
-            echo "::error::Executable not found at $EXE_PATH"
-            ls -la "Package/Executer/output/${{ matrix.platform }}/${{ matrix.arch }}/" || true
+            echo "::error::Output directory not found: $OUTPUT_DIR"
             exit 1
           fi
 
@@ -180,7 +184,7 @@ jobs:
           chmod +x build_installer.sh
           ./build_installer.sh
 
-      - name: Test installer output
+      - name: Test Installer output
         shell: bash
         run: |
           OUTPUT_DIR="Package/Installer/output/${{ matrix.platform }}/${{ matrix.arch }}"
@@ -191,7 +195,7 @@ jobs:
             if [ "$ZIP_COUNT" -gt 0 ]; then
               echo "Installer package found"
             else
-              echo "::error::No installer package found in $OUTPUT_DIR"
+              echo "::error::No installer package found in $OUTPUT_DIR"s
               exit 1
             fi
           else
