@@ -222,29 +222,33 @@ echo 生成的文件：
 dir dist\* /b
 
 echo [信息] 生成文件哈希值...
-if not exist output\Windows\%ARCH% mkdir output\Windows\%ARCH%
-copy dist\OHScrcpy.exe output\Windows\%ARCH%  >nul
+set OUTPUT_PATH=output\Windows\%ARCH%
+if not exist %OUTPUT_PATH% mkdir %OUTPUT_PATH%
+copy dist\OHScrcpy.exe %OUTPUT_PATH%  >nul
+
+set HASH_FILE_NAME=OHScrcpy_Exec_Windows_%ARCH%_%VERSION%_hash.txt
+set HASH_FILE=%OUTPUT_PATH%\%HASH_FILE_NAME%
 where certutil >nul 2>nul
 if %errorlevel% equ 0 (
-    echo 文件哈希值：> output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt
-    echo ================================================================>> output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt
-    echo dist\OHScrcpy.exe MD5>> output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt
+    echo 文件哈希值：> !HASH_FILE!
+    echo ================================================================>> !HASH_FILE!
+    echo dist\OHScrcpy.exe MD5>> !HASH_FILE!
     for /f "skip=1 delims=" %%i in ('certutil -hashfile dist\OHScrcpy.exe MD5') do (
-        echo %%i>> output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt 2>nul
+        echo %%i>> !HASH_FILE! 2>nul
         goto:exit_md5_loop
     )
     
     :exit_md5_loop
-    echo.>> output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt
-    echo dist\OHScrcpy.exe SHA256>> output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt
+    echo.>> !HASH_FILE!
+    echo dist\OHScrcpy.exe SHA256>> !HASH_FILE!
     for /f "skip=1 delims=" %%i in ('certutil -hashfile dist\OHScrcpy.exe SHA256') do (
-        echo %%i>> output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt 2>nul
+        echo %%i>> !HASH_FILE! 2>nul
         goto:exit_sha256_loop
     )
     
     :exit_sha256_loop
-    echo ================================================================>> output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt
-    echo [完成] 哈希文件已生成：output\Windows\%ARCH%\OHScrcpy_Exec_Windows_%ARCH%_hash.txt
+    echo ================================================================>> !HASH_FILE!
+    echo [完成] 哈希文件已生成：!HASH_FILE!
     goto:succ_end
 ) else (
     echo [警告] 无法生成哈希文件（certutil不存在）
@@ -290,43 +294,44 @@ if not defined LOG_SCRIPTS (
     echo [信息] 包含日志脚本（Windows平台）：%LOG_SCRIPTS%
 )
 
+REM 拷贝日志脚本到output目录
+if defined LOG_SCRIPTS (
+    for %%s in (%LOG_SCRIPTS%) do (
+        if exist %%s copy %%s %OUTPUT_PATH%\ >nul
+    )
+)
+
 echo.
 echo ******************************
 echo [信息] 创建发布ZIP包...
 echo ******************************
 
 set ZIP_NAME=OHScrcpy_Exec_Windows_%ARCH%_%VERSION%.zip
-set ZIP_PATH=output\Windows\%ARCH%\%ZIP_NAME%
+set ZIP_PATH=%OUTPUT_PATH%\%ZIP_NAME%
 
-REM 拷贝日志脚本到output目录
-if defined LOG_SCRIPTS (
-    for %%s in (%LOG_SCRIPTS%) do (
-        if exist %%s copy %%s output\Windows\%ARCH%\ >nul
-    )
-)
-
-cd output\Windows\%ARCH%
+cd %OUTPUT_PATH%
 
 if defined LOG_SCRIPTS (
     echo [信息] 包含日志脚本到ZIP包...
     if exist ..\..\..\..\tools\7z.exe (
-        ..\..\..\..\tools\7z.exe a -tzip %ZIP_NAME% OHScrcpy.exe OHScrcpy_Exec_Windows_%ARCH%_hash.txt %LOG_SCRIPTS%
+        ..\..\..\..\tools\7z.exe a -tzip %ZIP_NAME% OHScrcpy.exe %HASH_FILE_NAME% %LOG_SCRIPTS%
     ) else (
-        powershell -Command "Compress-Archive -Path OHScrcpy.exe,OHScrcpy_Exec_Windows_%ARCH%_hash.txt,%LOG_SCRIPTS_PS% -DestinationPath %ZIP_NAME% -Force"
+        powershell -Command "Compress-Archive -Path OHScrcpy.exe,%HASH_FILE_NAME%,%LOG_SCRIPTS_PS% -DestinationPath %ZIP_NAME% -Force"
     )
 ) else (
     if exist ..\..\..\..\tools\7z.exe (
-        ..\..\..\..\tools\7z.exe a -tzip %ZIP_NAME% OHScrcpy.exe OHScrcpy_Exec_Windows_%ARCH%_hash.txt
+        ..\..\..\..\tools\7z.exe a -tzip %ZIP_NAME% OHScrcpy.exe %HASH_FILE_NAME%
     ) else (
-        powershell -Command "Compress-Archive -Path OHScrcpy.exe,OHScrcpy_Exec_Windows_%ARCH%_hash.txt -DestinationPath %ZIP_NAME% -Force"
+        powershell -Command "Compress-Archive -Path OHScrcpy.exe,%HASH_FILE_NAME% -DestinationPath %ZIP_NAME% -Force"
     )
 )
+del OHScrcpy.exe %HASH_FILE_NAME% %LOG_SCRIPTS%
 
 chcp 936 >nul
 cd ..\..\..\
-if exist output\Windows\%ARCH%\%ZIP_NAME% (
+if exist %OUTPUT_PATH%\%ZIP_NAME% (
     echo [完成] ZIP包已创建: %ZIP_PATH%
-    dir output\Windows\%ARCH%\%ZIP_NAME%
+    dir %OUTPUT_PATH%\%ZIP_NAME%
 ) else (
     echo [警告] ZIP包创建失败
 )
@@ -335,14 +340,11 @@ echo.
 echo =============================================
 echo OpenHarmony OHScrcpy 自动化打包完成！
 echo =============================================
-echo 输出目录：output\Windows\%ARCH%\
+echo 操作系统: Windows
+echo 输出目录：%OUTPUT_PATH%\
 echo 生成文件：
-echo   - OHScrcpy.exe
-echo   - OHScrcpy_Exec_Windows_%ARCH%_hash.txt
-if defined LOG_SCRIPTS (
-    echo   - 日志脚本（3个.bat文件）
-)
 echo   - %ZIP_NAME%
+echo   - %HASH_FILE_NAME%
 echo.
 if not defined NO_PAUSE (
     pause

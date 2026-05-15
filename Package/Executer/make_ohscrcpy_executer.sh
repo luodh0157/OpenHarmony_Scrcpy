@@ -307,8 +307,9 @@ echo "生成的文件："
 ls -la "dist/"
 
 echo "[信息] 生成文件哈希值..."
-mkdir -p "output/${OS_TYPE}/${ARCH}"
-cp "dist/${EXECUTABLE_NAME}" "output/${OS_TYPE}/${ARCH}" 2>/dev/null
+OUTPUT_PATH="output/${OS_TYPE}/${ARCH}"
+mkdir -p "${OUTPUT_PATH}"
+cp "dist/${EXECUTABLE_NAME}" "${OUTPUT_PATH}" 2>/dev/null
 
 generate_hash() {
     local file="$1"
@@ -345,7 +346,8 @@ generate_hash() {
 }
 
 # 生成哈希文件
-HASH_FILE="output/${OS_TYPE}/${ARCH}/OHScrcpy_Exec_${OS_TYPE}_${ARCH}_hash.txt"
+HASH_FILE_NAME="OHScrcpy_Exec_${OS_TYPE}_${ARCH}_${VERSION}_hash.txt"
+HASH_FILE="${OUTPUT_PATH}/${HASH_FILE_NAME}"
 if generate_hash "dist/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
     echo "[完成] 哈希文件已生成：${HASH_FILE}"
     echo ""
@@ -377,24 +379,25 @@ else
     echo "[信息] 包含日志脚本（Linux/macOS平台）: $LOG_SCRIPTS"
 fi
 
-ZIP_NAME="OHScrcpy_Exec_${OS_TYPE}_${ARCH}_${VERSION}.zip"
-ZIP_PATH="output/${OS_TYPE}/${ARCH}/${ZIP_NAME}"
-
 # 先拷贝日志脚本到output目录（如果存在）
 if [ -n "$LOG_SCRIPTS" ]; then
-    mkdir -p "output/${OS_TYPE}/${ARCH}"
     for script in $LOG_SCRIPTS; do
-        cp "$script" "output/${OS_TYPE}/${ARCH}/" 2>/dev/null
+        cp "$script" "${OUTPUT_PATH}/" 2>/dev/null
     done
 fi
 
-cd output/${OS_TYPE}/${ARCH}
+ZIP_NAME="OHScrcpy_Exec_${OS_TYPE}_${ARCH}_${VERSION}.zip"
+ZIP_PATH="${OUTPUT_PATH}/${ZIP_NAME}"
+
+
+cd ${OUTPUT_PATH}
 
 if [ -n "$LOG_SCRIPTS" ]; then
-    zip -r "${ZIP_NAME}" ${EXECUTABLE_NAME} OHScrcpy_Exec_${OS_TYPE}_${ARCH}_hash.txt ${LOG_SCRIPTS}
+    zip -r "${ZIP_NAME}" ${EXECUTABLE_NAME} ${HASH_FILE_NAME} ${LOG_SCRIPTS}
 else
-    zip -r "${ZIP_NAME}" ${EXECUTABLE_NAME} OHScrcpy_Exec_${OS_TYPE}_${ARCH}_hash.txt
+    zip -r "${ZIP_NAME}" ${EXECUTABLE_NAME} ${HASH_FILE_NAME}
 fi
+rm ${EXECUTABLE_NAME} ${HASH_FILE_NAME} ${LOG_SCRIPTS}
 
 cd ../../..
 if [ $? -eq 0 ]; then
@@ -409,14 +412,10 @@ echo -e "\033[32m=============================================\033[0m"
 echo -e "\033[32mOpenHarmony OHScrcpy 自动化打包完成！\033[0m"
 echo -e "\033[32m=============================================\033[0m"
 echo "操作系统: ${OS_TYPE}"
-echo "输出目录: output/${OS_TYPE}/${ARCH}/"
+echo "输出目录: ${OUTPUT_PATH}/"
 echo "生成文件:"
-echo "  - ${EXECUTABLE_NAME}"
-echo "  - OHScrcpy_Exec_${OS_TYPE}_${ARCH}_hash.txt"
-if [ -n "$LOG_SCRIPTS" ]; then
-    echo "  - 日志脚本（3个.sh文件）"
-fi
 echo "  - ${ZIP_NAME}"
+echo "  - ${HASH_FILE_NAME}"
 echo ""
 
 if [ -z "${NO_PAUSE+set}" ]; then

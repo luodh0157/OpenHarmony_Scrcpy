@@ -91,6 +91,7 @@ echo "检查依赖完成"
 
 echo "开始打包..."
 OUTPUT_DIR="output/${OS_TYPE}/${ARCH}"
+mkdir -p "${OUTPUT_DIR}"
 cp install_ohscrcpy.sh "${DIST_DIR}"
 cp uninstall_ohscrcpy.sh "${DIST_DIR}"
 
@@ -147,7 +148,8 @@ generate_hash() {
 }
 
 # 生成哈希文件
-HASH_FILE="${OUTPUT_DIR}/OHScrcpy_Setup_${OS_TYPE}_${ARCH}_hash.txt"
+HASH_FILE_NAME="OHScrcpy_Setup_${OS_TYPE}_${ARCH}_${VERSION}_hash.txt"
+HASH_FILE="${OUTPUT_DIR}/${HASH_FILE_NAME}"
 if generate_hash "dist/OHScrcpy/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
     echo "[完成] 哈希文件已生成：${HASH_FILE}"
     echo ""
@@ -166,7 +168,9 @@ echo "OpenHarmony OHScrcpy 安装程序制作完成！      "
 echo "============================================="
 echo "操作系统: ${OS_TYPE}"
 echo "输出目录: ${OUTPUT_DIR}"
-echo "生成文件: ${EXECUTABLE_NAME}"
+echo "生成文件: "
+echo "  - OHScrcpy_Setup_${OS_TYPE}_${ARCH}_${VERSION}.zip"
+echo "  - ${HASH_FILE_NAME}"
 echo ""
 
 if [ -z "${NO_PAUSE+set}" ]; then

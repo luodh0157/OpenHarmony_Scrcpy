@@ -276,36 +276,6 @@ echo **********************
 echo 生成的文件：
 dir dist\OHScrcpy\* /b
 
-echo [信息] 生成文件哈希值...
-if not exist output\Windows mkdir output\Windows
-
-where certutil >nul 2>nul
-if %errorlevel% equ 0 (
-    echo 文件哈希值：> output\Windows\OHScrcpy_dir_hash.txt
-    echo ================================================================>> output\Windows\OHScrcpy_dir_hash.txt
-    echo dist\OHScrcpy.exe MD5>> output\Windows\OHScrcpy_dir_hash.txt
-    for /f "skip=1 delims=" %%i in ('certutil -hashfile dist\OHScrcpy.exe MD5') do (
-        echo %%i>> output\Windows\OHScrcpy_dir_hash.txt 2>nul
-        goto:exit_md5_loop
-    )
-    
-    :exit_md5_loop
-    echo.>> output\Windows\OHScrcpy_dir_hash.txt
-    echo dist\OHScrcpy.exe SHA256>> output\Windows\OHScrcpy_dir_hash.txt
-    for /f "skip=1 delims=" %%i in ('certutil -hashfile dist\OHScrcpy.exe SHA256') do (
-        echo %%i>> output\Windows\OHScrcpy_dir_hash.txt 2>nul
-        goto:exit_sha256_loop
-    )
-    
-    :exit_sha256_loop
-    echo ================================================================>> output\Windows\OHScrcpy_dir_hash.txt
-    echo [完成] 哈希文件已生成：OHScrcpy_dir_hash.txt
-    goto:succ_end
-) else (
-    echo [警告] 无法生成哈希文件（certutil不存在）
-)
-
-:succ_end
 echo.
 echo *************************************************
 echo [信息] 复制日志管理脚本到dist\OHScrcpy\目录...

@@ -345,57 +345,6 @@ echo "**********************"
 echo "生成的文件："
 ls -la "dist/OHScrcpy/"
 
-echo "[信息] 生成文件哈希值..."
-mkdir -p "output/${OS_TYPE}/${ARCH}"
-
-generate_hash() {
-    local file="$1"
-    local output_file="$2"
-    
-    echo "文件哈希值：" > "${output_file}"
-    echo "=================================================================" >> "${output_file}"
-    
-    if [ "${OS_TYPE}" = "macOS" ]; then
-        if command -v md5 &> /dev/null; then
-            echo "${EXECUTABLE_NAME} MD5" >> "${output_file}"
-            md5 "${file}" | awk '{print $4}' >> "${output_file}"
-            echo "" >> "${output_file}"
-        fi
-        
-        if command -v shasum &> /dev/null; then
-            echo "${EXECUTABLE_NAME} SHA256" >> "${output_file}"
-            shasum -a 256 "${file}" | awk '{print $1}' >> "${output_file}"
-        fi
-    else
-        if command -v md5sum &> /dev/null; then
-            echo "${EXECUTABLE_NAME} MD5" >> "${output_file}"
-            md5sum "${file}" | awk '{print $1}' >> "${output_file}"
-            echo "" >> "${output_file}"
-        fi
-        
-        if command -v sha256sum &> /dev/null; then
-            echo "${EXECUTABLE_NAME} SHA256" >> "${output_file}"
-            sha256sum "${file}" | awk '{print $1}' >> "${output_file}"
-        fi
-    fi
-    
-    echo "=================================================================" >> "${output_file}"
-}
-
-# 生成哈希文件
-HASH_FILE="output/${OS_TYPE}/${ARCH}/OHScrcpy_dir_hash.txt"
-if generate_hash "dist/OHScrcpy/${EXECUTABLE_NAME}" "${HASH_FILE}"; then
-    echo "[完成] 哈希文件已生成：${HASH_FILE}"
-    echo ""
-    echo "生成的哈希值："
-    cat "${HASH_FILE}"
-else
-    echo "[警告] 无法生成哈希文件（缺少哈希工具）"
-    if [ "${OS_TYPE}" = "macOS" ]; then
-        echo "对于macOS，可以安装GNU工具：brew install md5sha1sum"
-    fi
-fi
-
 echo ""
 echo "************************************************"
 echo "[信息] 复制日志管理脚本到dist\OHScrcpy\目录..."

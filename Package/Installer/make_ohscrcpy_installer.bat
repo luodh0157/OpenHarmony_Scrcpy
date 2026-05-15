@@ -140,24 +140,11 @@ for %%f in (output\Windows\%ARCH%\*.exe) do (
 )
 echo 安装程序位置：%cd%\output\Windows\%ARCH%\
 
-
-echo [信息] 生成安装包信息...
-set PACKAGE_INFO_FILE="output\Windows\%ARCH%\package_info.txt"
-echo OHScrcpy %VERSION% 安装包> %PACKAGE_INFO_FILE%
-echo ==============================>> %PACKAGE_INFO_FILE%
-echo 生成时间：%date% %time%>> %PACKAGE_INFO_FILE%
-echo.>> %PACKAGE_INFO_FILE%
-echo 包含文件：>> %PACKAGE_INFO_FILE%
-dir dist\OHScrcpy\* /b >> %PACKAGE_INFO_FILE%
-echo. >> %PACKAGE_INFO_FILE%
-echo 文档文件：>> %PACKAGE_INFO_FILE%
-dir docs\* /b >> %PACKAGE_INFO_FILE%
-
 echo [信息] 生成安装程序哈希值...
 pushd output\Windows\%ARCH%\
 where certutil >nul 2>nul
 if %errorlevel% equ 0 (
-    set "HASH_FILE=OHScrcpy_setup_Windows_%ARCH%_hash.txt"
+    set "HASH_FILE=OHScrcpy_setup_Windows_%ARCH%_%VERSION%_hash.txt"
     echo 安装程序哈希值：> "!HASH_FILE!"
     echo ============================================================================>> "!HASH_FILE!"
     for %%f in (.\*.exe) do (
@@ -185,6 +172,11 @@ echo.
 echo =============================================
 echo OpenHarmony OHScrcpy 安装程序制作完成！
 echo =============================================
+echo 操作系统: Windows
+echo 输出目录: %cd%\output\Windows\%ARCH%\
+echo 生成文件: 
+echo   - OHScrcpy_Setup_Windows_%ARCH%_%VERSION%.exe
+echo   - !HASH_FILE!"
 echo.
 if not defined NO_PAUSE (
     pause
