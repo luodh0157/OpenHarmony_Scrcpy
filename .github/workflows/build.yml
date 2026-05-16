@@ -32,17 +32,9 @@ jobs:
             platform: Windows
             arch: x64
             ext: .exe
-          - os: windows-11-arm
-            platform: Windows
-            arch: arm64
-            ext: .exe
           - os: ubuntu-latest
             platform: Linux
             arch: x64
-            ext: ''
-          - os: ubuntu-24.04-arm
-            platform: Linux
-            arch: arm64
             ext: ''
           - os: macos-latest
             platform: macOS
@@ -50,7 +42,7 @@ jobs:
             ext: ''
           - os: macos-15-intel
             platform: macOS
-            arch: Intel
+            arch: x64
             ext: ''
     runs-on: ${{ matrix.os }}
     steps:
@@ -134,17 +126,9 @@ jobs:
             platform: Windows
             arch: x64
             ext: .exe
-          - os: windows-11-arm
-            platform: Windows
-            arch: arm64
-            ext: .exe
           - os: ubuntu-latest
             platform: Linux
             arch: x64
-            ext: ''
-          - os: ubuntu-24.04-arm
-            platform: Linux
-            arch: arm64
             ext: ''
           - os: macos-latest
             platform: macOS
@@ -152,7 +136,7 @@ jobs:
             ext: ''
           - os: macos-15-intel
             platform: macOS
-            arch: Intel
+            arch: x64
             ext: ''
     runs-on: ${{ matrix.os }}
     steps:
@@ -234,7 +218,7 @@ jobs:
       - build-executer
       - build-installer
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/OpenHarmony_Scrcpy_V')
     timeout-minutes: 15
     permissions:
       contents: write
