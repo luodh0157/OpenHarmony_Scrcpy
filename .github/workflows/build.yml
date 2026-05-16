@@ -32,17 +32,25 @@ jobs:
             platform: Windows
             arch: x64
             ext: .exe
+          - os: windows-11-arm
+            platform: Windows
+            arch: arm64
+            ext: .exe
           - os: ubuntu-latest
             platform: Linux
             arch: x64
+            ext: ''
+          - os: ubuntu-24.04-arm
+            platform: Linux
+            arch: arm64
             ext: ''
           - os: macos-latest
             platform: macOS
             arch: arm64
             ext: ''
-          - os: macos-13
+          - os: macos-15-intel
             platform: macOS
-            arch: x64
+            arch: Intel
             ext: ''
     runs-on: ${{ matrix.os }}
     steps:
@@ -126,17 +134,25 @@ jobs:
             platform: Windows
             arch: x64
             ext: .exe
+          - os: windows-11-arm
+            platform: Windows
+            arch: arm64
+            ext: .exe
           - os: ubuntu-latest
             platform: Linux
             arch: x64
+            ext: ''
+          - os: ubuntu-24.04-arm
+            platform: Linux
+            arch: arm64
             ext: ''
           - os: macos-latest
             platform: macOS
             arch: arm64
             ext: ''
-          - os: macos-13
+          - os: macos-15-intel
             platform: macOS
-            arch: x64
+            arch: Intel
             ext: ''
     runs-on: ${{ matrix.os }}
     steps:
