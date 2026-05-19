@@ -23,7 +23,6 @@ from typing import Optional, List
 from .constants import DEFAULT_PORT, LogLevel
 from .logger import print_log
 from .hdc_executor import HDCCommandExecutor
-from .server_manager import ServerManager
 
 
 @dataclass
@@ -44,7 +43,6 @@ class DeviceManager:
         self.hdc = hdc_executor
         self.devices: List[DeviceInfo] = []
         self.current_device: Optional[DeviceInfo] = None
-        self.server_manager: Optional[ServerManager] = None
         self.port_forwarding = -1
         self.log_title = "设备管理器"
         
@@ -74,11 +72,6 @@ class DeviceManager:
             devices.append(DeviceInfo(sn=sn, model=model, manufacturer=manufacturer))
         
         self.devices = devices
-        if devices:
-            self.current_device = devices[0]
-            self.hdc.set_device(devices[0].sn)
-            self.server_manager = ServerManager(devices[0].manufacturer, self.hdc)
-        
         return devices
     
     def get_device_param(self, sn: str, param: str) -> str:
@@ -99,12 +92,11 @@ class DeviceManager:
     
     def select_device(self, sn: str) -> bool:
         """选择设备"""
+        print_log(LogLevel.INFO, self.log_title, f"选择设备: [{sn}]")
         for device in self.devices:
             if device.sn == sn:
                 self.current_device = device
                 self.hdc.set_device(sn)
-                if self.server_manager:
-                    self.server_manager.update_manufacturer(device.manufacturer)
                 return True
         return False
     
@@ -167,41 +159,34 @@ class DeviceManager:
         print_log(LogLevel.INFO, self.log_title, f"移除端口转发转发成功: [{local_port}, {remote_port}]")
         return True
     
-    def install_server(self) -> bool:
+    def create_server_manager(self, manufacturer: str):
+        """创建服务端管理器"""
+        from .server_manager import ServerManager
+        return ServerManager(manufacturer, self.hdc)
+    
+    def install_server(self, server_manager) -> bool:
         """安装服务端"""
-        if not self.server_manager:
-            return False
-        return self.server_manager.install_server()
+        return server_manager.install_server()
     
-    def uninstall_server(self) -> bool:
+    def uninstall_server(self, server_manager) -> bool:
         """卸载服务端"""
-        if not self.server_manager:
-            return False
-        return self.server_manager.uninstall_server()
+        return server_manager.uninstall_server()
     
-    def start_server(self, port: int) -> bool:
+    def start_server(self, server_manager, port: int) -> bool:
         """启动服务端"""
-        if not self.server_manager:
-            return False
-        return self.server_manager.start_server(port)
+        return server_manager.start_server(port)
     
-    def stop_server(self) -> bool:
+    def stop_server(self, server_manager) -> bool:
         """停止服务端"""
-        if not self.server_manager:
-            return False
-        return self.server_manager.stop_server()
+        return server_manager.stop_server()
         
-    def check_server_installed(self) -> bool:
+    def check_server_installed(self, server_manager) -> bool:
         """检查服务端是否已安装"""
-        if not self.server_manager:
-            return False
-        return self.server_manager.check_server_installed()
+        return server_manager.check_server_installed()
         
-    def check_server_running(self) -> bool:
+    def check_server_running(self, server_manager) -> bool:
         """检查服务端是否在运行"""
-        if not self.server_manager:
-            return False
-        return self.server_manager.check_server_running()
+        return server_manager.check_server_running()
 
 
 __all__ = ["DeviceInfo", "DeviceManager"]

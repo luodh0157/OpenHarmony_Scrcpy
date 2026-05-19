@@ -18,16 +18,14 @@
 """
 
 import tkinter as tk
-from typing import Callable, Optional, Any
+from typing import Optional
 
 
 class VideoPanel:
     """视频显示面板"""
     
-    def __init__(self, parent: tk.Widget, on_click: Callable[[int, int], None], on_drag: Callable[[int, int, int, int], None]) -> None:
+    def __init__(self, parent: tk.Widget) -> None:
         self.parent: tk.Widget = parent
-        self.on_click: Callable[[int, int], None] = on_click
-        self.on_drag: Callable[[int, int, int, int], None] = on_drag
         
         self.frame: Optional[tk.LabelFrame] = None
         self.canvas: Optional[tk.Canvas] = None
@@ -43,31 +41,7 @@ class VideoPanel:
         self.canvas = tk.Canvas(frame, bg="#1a1a2e", highlightthickness=1)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         
-        self.canvas.bind("<Button-1>", self._on_canvas_click)
-        self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
-        self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
-        
-        self.drag_start_x: int = 0
-        self.drag_start_y: int = 0
-        
         self.frame = frame
-    
-    def _on_canvas_click(self, event: tk.Event) -> None:
-        """处理画布点击"""
-        self.drag_start_x = event.x
-        self.drag_start_y = event.y
-        if self.on_click:
-            self.on_click(event.x, event.y)
-    
-    def _on_canvas_drag(self, event: tk.Event) -> None:
-        """处理画布拖动"""
-        pass
-    
-    def _on_canvas_release(self, event: tk.Event) -> None:
-        """处理画布释放"""
-        if self.drag_start_x != event.x or self.drag_start_y != event.y:
-            if self.on_drag:
-                self.on_drag(self.drag_start_x, self.drag_start_y, event.x, event.y)
     
     def show_waiting_screen(self, message: str = "等待连接...") -> None:
         """显示等待画面"""

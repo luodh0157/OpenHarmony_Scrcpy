@@ -22,6 +22,9 @@ from .device_panel import DevicePanel
 from .control_panel import ControlPanel, InfoPanel
 from .video_panel import VideoPanel
 from .main_window import MainWindow
+from .connection_manager import ConnectionManager, ConnectionState
+from .video_display import VideoDisplay
+from .server_deployer import ServerDeployer
 
 __all__ = [
     "DeviceController",
@@ -30,4 +33,8 @@ __all__ = [
     "InfoPanel",
     "VideoPanel",
     "MainWindow",
+    "ConnectionManager",
+    "ConnectionState",
+    "VideoDisplay",
+    "ServerDeployer",
 ]

@@ -21,8 +21,6 @@ import time
 import traceback
 from typing import Optional, Any
 
-import numpy as np
-
 from core.constants import LogLevel
 from core.logger import print_log
 from .config import VideoStreamConfig
@@ -186,7 +184,7 @@ class VideoDecoder:
             return False
         return data[0:4] == b'\x00\x00\x00\x01' or data[0:3] == b'\x00\x00\x01'
 
-    def decode_frame(self, frame_data: bytes, is_keyframe: bool = False) -> Optional[np.ndarray]:
+    def decode_frame(self, frame_data: bytes, is_keyframe: bool = False):
         """解码视频帧"""
         if not frame_data or len(frame_data) == 0:
             print_log(LogLevel.WARN, self.log_title, f"空帧数据")

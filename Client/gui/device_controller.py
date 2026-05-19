@@ -50,17 +50,24 @@ class DeviceController:
         self.drag_start: Optional[Tuple[int, int]] = None
         self.log_title: str = "设备控制器"
     
-    def set_display_resolution(self, width: int, height: int, ratio: float) -> None:
-        """设置显示分辨率"""
-        self.display_width = width
-        self.display_height = height
-        self.display_ratio = ratio
+    def set_display_resolution(self, video_width: int, video_height: int, canvas_width: int, canvas_height: int) -> Tuple[int, int, float]:
+        """计算并设置显示分辨率"""
+        if canvas_width <= 10:
+            canvas_width = 800
+        if canvas_height <= 10:
+            canvas_height = 600
+        
+        self.display_ratio = min(canvas_width / video_width, canvas_height / video_height)
+        self.display_width = int(video_width * self.display_ratio)
+        self.display_height = int(video_height * self.display_ratio)
+        print_log(LogLevel.INFO, self.log_title, f"显示尺寸: {self.display_width}x{self.display_height} ratio:{self.display_ratio}")
+
         if self.video_canvas:
-            self.left = int((self.video_canvas.winfo_width() - width) / 2)
-            self.right = int((self.video_canvas.winfo_width() - width) / 2 + width)
-            self.top = int((self.video_canvas.winfo_height() - height) / 2)
-            self.bottom = int((self.video_canvas.winfo_height() - height) / 2 + height)
-            print_log(LogLevel.DEBUG, self.log_title, f"图像显示区域: left:{self.left} right:{self.right} top:{self.top} bottom:{self.bottom}")
+            self.left = int((self.video_canvas.winfo_width() - self.display_width) / 2)
+            self.right = int((self.video_canvas.winfo_width() - self.display_width) / 2 + self.display_width)
+            self.top = int((self.video_canvas.winfo_height() - self.display_height) / 2)
+            self.bottom = int((self.video_canvas.winfo_height() - self.display_height) / 2 + self.display_height)
+        return self.display_width, self.display_height, self.display_ratio
     
     def bind_video_canvas(self, canvas: tk.Canvas) -> None:
         """绑定视频画布"""
@@ -70,15 +77,24 @@ class DeviceController:
         canvas.bind("<B1-Motion>", self._on_mouse_drag)
         canvas.bind("<ButtonRelease-1>", self._on_mouse_up)
     
+    def reset(self) -> None:
+        """重置控制器状态（切换设备时调用）"""
+        self.display_width = 0
+        self.display_height = 0
+        self.display_ratio = 0.0
+        self.left = 0
+        self.right = 0
+        self.top = 0
+        self.bottom = 0
+        self.drag_start = None
+    
     def _window_to_device_coords(self, window_x: int, window_y: int) -> Tuple[int, int]:
         """窗口坐标转设备坐标"""
         if not self.video_canvas:
             return 0, 0
         
-        device_x = int((window_x - self.left) / self.display_ratio)
-        device_y = int((window_y - self.top) / self.display_ratio)
-        print_log(LogLevel.DEBUG, self.log_title, f"winow({window_x},{window_y}) ==> device({device_x},{device_y})")
-        
+        device_x = int((window_x - self.left) / self.display_ratio) if self.display_ratio != 0 else 0
+        device_y = int((window_y - self.top) / self.display_ratio) if self.display_ratio != 0 else 0
         return device_x, device_y
     
     def _on_mouse_down(self, event: tk.Event) -> None:

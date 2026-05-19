@@ -64,11 +64,14 @@ class DevicePanel:
         
         self.frame = frame
     
-    def update_devices(self, devices: List[str]) -> None:
+    def update_devices(self, devices: List[str], current_device: str=None) -> None:
         """更新设备列表"""
         if devices:
             self.device_combo['values'] = devices
-            self.device_combo.current(0)
+            if current_device and current_device in devices:
+                self.device_combo.current(devices.index(current_device))
+            else:
+                self.device_combo.current(0)
         else:
             self.device_combo['values'] = []
             self.device_var.set("")

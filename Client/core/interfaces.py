@@ -17,8 +17,7 @@
 OpenHarmony_Scrcpy 接口定义（Protocol）
 """
 
-from typing import Protocol, Optional, List, Dict, Any, Callable
-import numpy as np
+from typing import Protocol, Optional, List, Dict, Any, Callable, Tuple
 
 
 class IHDCExecutor(Protocol):
@@ -65,7 +64,7 @@ class IServerManager(Protocol):
         """启动服务端"""
         ...
     
-    def stop(self) -> None:
+    def stop_server(self) -> bool:
         """停止服务端"""
         ...
     
@@ -88,7 +87,7 @@ class IDeviceManager(Protocol):
     log_title: str
     hdc: IHDCExecutor
     
-    def list_devices(self) -> List[Any]:
+    def discover_devices(self) -> List[Any]:
         """列出设备"""
         ...
     
@@ -135,7 +134,7 @@ class IVideoDecoder(Protocol):
         """检查是否就绪"""
         ...
     
-    def decode_frame(self, frame_data: bytes, is_keyframe: bool = False) -> Optional[np.ndarray]:
+    def decode_frame(self, frame_data: bytes, is_keyframe: bool = False) -> Optional['np.ndarray']:
         """解码帧"""
         ...
     
@@ -175,7 +174,7 @@ class IVideoStreamClient(Protocol):
         """断开连接"""
         ...
     
-    def get_current_frame(self, timeout: float = 0.001) -> Optional[np.ndarray]:
+    def get_current_frame(self, timeout: float = 0.001) -> Optional['np.ndarray']:
         """获取当前帧"""
         ...
 
@@ -185,8 +184,8 @@ class IDeviceController(Protocol):
     
     log_title: str
     
-    def set_display_resolution(self, width: int, height: int, ratio: float) -> None:
-        """设置显示分辨率"""
+    def set_display_resolution(self, video_width: int, video_height: int, canvas_width: int, canvas_height: int) -> Tuple[int, int, float]:
+        """计算并设置显示分辨率"""
         ...
     
     def handle_click(self, x: int, y: int) -> None:

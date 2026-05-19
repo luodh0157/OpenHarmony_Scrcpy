@@ -25,8 +25,6 @@ import struct
 import traceback
 from typing import Optional, Callable, Tuple, Any
 
-import numpy as np
-
 from core.constants import HOST, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL, PACKET_HEADER_SIZE, PacketType, LogLevel
 from core.logger import print_log
 from core.device_manager import DeviceManager
@@ -37,7 +35,7 @@ from .decoder import VideoDecoder
 class VideoStreamClient:
     """视频流客户端 - 优化数据包处理"""
     
-    def __init__(self, device_manager: DeviceManager, on_frame_decoded: Optional[Callable[[np.ndarray], None]] = None, debug: bool = False) -> None:
+    def __init__(self, device_manager: DeviceManager, on_frame_decoded: Optional[Callable] = None, debug: bool = False) -> None:
         self.socket: Optional[socket.socket] = None
         self.is_connected: bool = False
         self.is_streaming: bool = False
@@ -53,9 +51,9 @@ class VideoStreamClient:
         self.vps_data: Optional[bytes] = None
         
         self.raw_frame_queue: queue.Queue[Tuple[bytes, bool, int]] = queue.Queue(maxsize=100)
-        self.frame_queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=50)
+        self.frame_queue: queue.Queue = queue.Queue(maxsize=50)
         
-        self.on_frame_decoded: Optional[Callable[[np.ndarray], None]] = on_frame_decoded
+        self.on_frame_decoded: Optional[Callable] = on_frame_decoded
         
         self.frame_count: int = 0
         self.total_bytes: int = 0
@@ -144,7 +142,7 @@ class VideoStreamClient:
         if self.socket:
             try:
                 self.socket.close()
-            except:
+            except OSError:
                 pass
             self.socket = None
 
@@ -327,35 +325,27 @@ class VideoStreamClient:
 
         while len(self.recv_buffer) >= PACKET_HEADER_SIZE and processed_count < max_process_per_cycle:
             try:
-                # 1. 尝试读取包头
                 packet_type = struct.unpack('>I', self.recv_buffer[0:4])[0]
                 data_len = struct.unpack('>I', self.recv_buffer[4:8])[0]
 
-                # 2. 验证包头有效性
                 valid_types = [PacketType.PACKET_HEARTBEAT, PacketType.PACKET_SPS, PacketType.PACKET_PPS,
                                PacketType.PACKET_KEYFRAME, PacketType.PACKET_FRAME, PacketType.PACKET_CONFIG,
                                PacketType.PACKET_VPS]
                 if packet_type not in valid_types:
-                    # 严重错误，丢弃第一个字节，尝试重新寻找同步点
                     del self.recv_buffer[0:1]
                     self.bad_packet_bytes += 1
-                    continue  # 跳出本次循环，重新尝试
+                    continue
                 
                 if self.bad_packet_bytes > 0:
                     print_log(LogLevel.WARN, self.log_title, f"错误: 无效包类型, 重新同步(丢弃 {self.bad_packet_bytes} 字节坏数据...)")
                     self.bad_packet_bytes = 0
                 
-                # 3. 检查数据长度是否在合理范围内
-                MAX_ALLOWED_SIZE = 10 * 1024 * 1024  # 10MB
+                MAX_ALLOWED_SIZE = 10 * 1024 * 1024
                 if data_len < 0 or data_len > MAX_ALLOWED_SIZE:
                     print_log(LogLevel.WARN, self.log_title, f"错误: 异常数据长度 {data_len}，包类型={packet_type}，尝试重新同步...")
-                    # 遇到异常长度，说明彻底失步了，不能只丢弃包头。
-                    # 策略：在缓冲区中搜索下一个看起来像合法包头的位置（0x0000000?）
                     sync_found = False
-                    for i in range(1, len(self.recv_buffer) - 1):
-                        if i + 8 > len(self.recv_buffer):
-                            break
-                        
+                    buf_len = len(self.recv_buffer)
+                    for i in range(1, buf_len - 7):
                         potential_type = struct.unpack('>I', self.recv_buffer[i:i+4])[0]
                         potential_len = struct.unpack('>I', self.recv_buffer[i+4:i+8])[0]
                         if (potential_type in valid_types and 
@@ -366,37 +356,28 @@ class VideoStreamClient:
                             break
                     
                     if not sync_found:
-                        # 没找到，清空整个缓冲区，从头开始
                         print_log(LogLevel.WARN, self.log_title, f"未找到同步点，清空整个接收缓冲区！！！")
                         self.recv_buffer.clear()
-                    continue  # 同步后，重新开始循环
+                    continue
 
-                # 4. 检查是否有一个完整的数据包
                 if len(self.recv_buffer) >= PACKET_HEADER_SIZE + data_len:
-                    # 提取完整数据包
                     packet_data = bytes(self.recv_buffer[PACKET_HEADER_SIZE:PACKET_HEADER_SIZE + data_len])
-                    # 从缓冲区移除已处理的数据
                     del self.recv_buffer[:PACKET_HEADER_SIZE + data_len]
                     
-                    # 4. 处理这个完整的数据包
                     self._handle_packet(packet_type, data_len, packet_data)
                     processed_count += 1
                     self.packet_count += 1
                 else:
-                    # 数据包不完整，保持缓冲区不动，等待更多数据
                     break
 
             except struct.error as e:
                 print_log(LogLevel.ERROR, self.log_title, f"解析包头结构失败: {e}，丢弃 1 字节，尝试重新同步")
                 if len(self.recv_buffer) > 0:
                     del self.recv_buffer[0:1]
-                    print_log(LogLevel.WARN, self.log_title, f"丢弃 1 字节，尝试重新同步")
                     self.bad_packet_bytes += 1
-                
                 continue
             except Exception as e:
                 print_log(LogLevel.ERROR, self.log_title, f"处理数据时发生未知异常: {e}，清空整个接收缓冲区！！！")
-                # 发生未知异常，保守策略：清空缓冲区
                 self.recv_buffer.clear()
                 break
     
@@ -489,7 +470,7 @@ class VideoStreamClient:
                     while not self.raw_frame_queue.empty():
                         self.raw_frame_queue.get_nowait()
                     self.raw_frame_queue.put_nowait((packet_data, is_keyframe, data_len))
-                except:
+                except queue.Empty:
                     pass
     
     def _process_thread_func(self) -> None:
@@ -554,14 +535,14 @@ class VideoStreamClient:
                             if self.on_frame_decoded:
                                 try:
                                     self.on_frame_decoded(rgb_array)
-                                except:
+                                except Exception:
                                     pass
                                     
                         except queue.Full:
                             try:
                                 self.frame_queue.get_nowait()
                                 self.frame_queue.put_nowait(rgb_array)
-                            except:
+                            except queue.Empty:
                                 pass
                     else:
                         self.decode_failure += 1
@@ -570,7 +551,7 @@ class VideoStreamClient:
                             while not self.frame_queue.empty():
                                 try:
                                     self.frame_queue.get_nowait()
-                                except:
+                                except queue.Empty:
                                     break
                         elif self.decode_failure % 50 == 0:
                             print_log(LogLevel.WARN, self.log_title, f"P帧解码失败累计={self.decode_failure}")
@@ -586,7 +567,7 @@ class VideoStreamClient:
         
         print_log(LogLevel.INFO, self.log_title, f"解码线程结束")
 
-    def get_current_frame(self, timeout: float = 0.001) -> Optional[np.ndarray]:
+    def get_current_frame(self, timeout: float = 0.001):
         """获取当前显示帧"""
         try:
             return self.frame_queue.get(timeout=timeout)
@@ -594,20 +575,23 @@ class VideoStreamClient:
             return None
 
     def disconnect(self) -> None:
-        """断开连接"""
+        """断开连接（仅清理自身资源：socket、解码器、队列、线程）"""
         self._stop_event.set()
         self.is_connected = False
         self.is_streaming = False
         
+        self.frame_count: int = 0
+        self.total_bytes: int = 0
+        self.decode_failure: int = 0
+        self.last_data_time: float = 0
+        self.last_heartbeat_time: float = 0
+        self.last_frame_time: float = 0
+        self.last_print_frame_count: int = 0
+        self.packet_count: int = 0
+        self.bad_packet_bytes: int = 0
+        
         def disconnect_async() -> None:
             print_log(LogLevel.INFO, self.log_title, f"断开连接...")
-            # 停止服务端
-            self.device_manager.stop_server()
-            # 移除端口转发
-            port = self.device_manager.get_port_forwarding()
-            if port > 0:
-                self.device_manager.remove_port_forwarding(port, port)
-                self.device_manager.reset_port_forwarding()
             
             self._stop_event.set()
             
@@ -619,7 +603,7 @@ class VideoStreamClient:
             if self.socket:
                 try:
                     self.socket.close()
-                except:
+                except OSError:
                     pass
                 self.socket = None
             
@@ -637,14 +621,16 @@ class VideoStreamClient:
             while not self.raw_frame_queue.empty():
                 try:
                     self.raw_frame_queue.get_nowait()
-                except:
+                except queue.Empty:
                     break
             
             while not self.frame_queue.empty():
                 try:
                     self.frame_queue.get_nowait()
-                except:
+                except queue.Empty:
                     break
+            
+            self.recv_buffer.clear()
             
             print_log(LogLevel.INFO, self.log_title, f"断开连接已完成")
         

@@ -39,7 +39,7 @@ from .device_manager import DeviceInfo, DeviceManager
 from .exceptions import (
     OHScrcpyError,
     DeviceNotFoundError,
-    ConnectionError,
+    StreamConnectError,
     ServerDeployError,
     VideoDecodeError,
     ProtocolError,
@@ -70,7 +70,7 @@ __all__ = [
     "DeviceManager",
     "OHScrcpyError",
     "DeviceNotFoundError",
-    "ConnectionError",
+    "StreamConnectError",
     "ServerDeployError",
     "VideoDecodeError",
     "ProtocolError",

@@ -34,6 +34,7 @@ class Logger:
     _log_dir: Optional[str] = None
     _config: Dict[str, Any] = {}
     _initialized: bool = False
+    _file_handle: Optional[Any] = None
     
     def __new__(cls) -> 'Logger':
         if cls._instance is None:
@@ -97,11 +98,27 @@ class Logger:
         instance._log_dir = log_dir
         instance._log_file = log_file
         
+        # 关闭旧句柄
+        if instance._file_handle:
+            try:
+                instance._file_handle.close()
+            except Exception:
+                pass
+            instance._file_handle = None
+        
         if log_dir and not os.path.exists(log_dir):
             try:
                 os.makedirs(log_dir)
             except Exception:
                 pass
+        
+        # 打开新句柄
+        if log_file and log_dir:
+            full_path = os.path.join(log_dir, log_file)
+            try:
+                instance._file_handle = open(full_path, 'a', encoding='utf-8')
+            except Exception:
+                instance._file_handle = None
     
     @classmethod
     def get_log_file(cls) -> Optional[str]:
@@ -134,14 +151,13 @@ class Logger:
         # 控制台输出（简化格式）
         print(log_line)
         
-        # 文件输出（完整格式带日期）
-        log_file = self.get_log_file()
-        if log_file:
+        # 文件输出（完整格式带日期）- 复用句柄
+        if self._file_handle:
             try:
                 full_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                 full_log_line = f"[{full_timestamp}][{level_name}][{title}] {content}"
-                with open(log_file, 'a', encoding='utf-8') as f:
-                    f.write(full_log_line + '\n')
+                self._file_handle.write(full_log_line + '\n')
+                self._file_handle.flush()
             except Exception:
                 pass
 

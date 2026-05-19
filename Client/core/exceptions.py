@@ -36,7 +36,7 @@ class DeviceNotFoundError(OHScrcpyError):
         super().__init__(message, error_code=1001)
 
 
-class ConnectionError(OHScrcpyError):
+class StreamConnectError(OHScrcpyError):
     """连接错误"""
     
     def __init__(self, message: str = "Connection failed"):
@@ -74,7 +74,7 @@ class ConfigError(OHScrcpyError):
 __all__ = [
     "OHScrcpyError",
     "DeviceNotFoundError",
-    "ConnectionError",
+    "StreamConnectError",
     "ServerDeployError",
     "VideoDecodeError",
     "ProtocolError",

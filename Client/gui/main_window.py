@@ -27,8 +27,6 @@ from tkinter import messagebox
 from datetime import datetime
 from typing import Optional, Callable, Dict, List, Any
 
-import numpy as np
-
 from core import (
     AUTHOR,
     PROJECT_URL,
@@ -49,6 +47,9 @@ from gui.device_panel import DevicePanel
 from gui.control_panel import ControlPanel, InfoPanel
 from gui.video_panel import VideoPanel
 from gui.device_controller import DeviceController
+from gui.connection_manager import ConnectionManager, ConnectionState
+from gui.video_display import VideoDisplay
+from gui.server_deployer import ServerDeployer
 
 
 class MainWindow:
@@ -62,29 +63,8 @@ class MainWindow:
         self.log_title = "GUI"
         
         self.is_connected = False
-        self.current_frame = None
-        self.tk_image = None
-        self.last_display_time = 0
         self.server_deploy_lock = threading.Lock()
         self.server_deploy_state = ServerDeployState.IDLE
-        
-        self.video_width = 0
-        self.video_height = 0
-        self.video_ratio = 0.0
-        self.display_width = 0
-        self.display_height = 0
-        self.canvas_width = 800
-        self.canvas_height = 600
-        
-        self.fps = 0
-        self.frame_counter = 0
-        self.last_fps_time = time.time()
-        self.displayed_frames = 0
-        self.last_print_frames = 0
-        
-        self.last_gc_frame_count = 0
-        self.gc_interval_frames = 500
-        self.image_refs = []
         
         self.video_canvas = None
         self.status_text_id = None
@@ -95,15 +75,24 @@ class MainWindow:
         self.video_panel = None
         self.info_panel = None
         
-        self.hdc_executor = None
-        self.device_manager = None
+        self.hdc_executor: Optional[HDCCommandExecutor] = None
+        self.device_manager: Optional[DeviceManager] = None
         self.server_manager = None
-        self.device_controller = None
-        self.video_client = None
+        self.device_controller: Optional[DeviceController] = None
+        self.video_client: Optional[VideoStreamClient] = None
+        
+        self.connection_manager: Optional[ConnectionManager] = None
+        self.video_display: Optional[VideoDisplay] = None
+        self.server_deployer: Optional[ServerDeployer] = None
+        
+        self.device_status_label = None
+        self.status_label = None
+        self.connection_status_label = None
+        self.performance_label = None
         
         self._setup_ui()
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
-        self.root.bind('<Configure>', self._on_window_resize)
+        self._bind_shortcuts()
         
         self._init_components_async()
         
@@ -144,7 +133,7 @@ class MainWindow:
         main_frame = tk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        self.video_panel = VideoPanel(main_frame, self._on_click, self._on_drag)
+        self.video_panel = VideoPanel(main_frame)
         self.video_canvas = self.video_panel.get_canvas()
         
         control_frame = tk.Frame(main_frame, width=300)
@@ -184,17 +173,59 @@ class MainWindow:
                                           font=("Microsoft YaHei", 9), fg="#3498db", bg="#34495e")
         self.performance_label.pack(side=tk.RIGHT, padx=20)
     
+    def _bind_shortcuts(self) -> None:
+        """绑定调试快捷键"""
+        self.root.bind('<F5>', lambda e: self._refresh_devices())
+        self.root.bind('<F6>', lambda e: self._save_debug_frame())
+        self.root.bind('<F8>', lambda e: self._show_debug_window())
+        self.root.bind('<F9>', lambda e: self.video_display.force_garbage_collection() if self.video_display else None)
+    
     def _init_components_async(self) -> None:
         """异步初始化组件"""
         def init() -> None:
             self.hdc_executor = HDCCommandExecutor()
             self.device_manager = DeviceManager(self.hdc_executor)
-            self.video_client = VideoStreamClient(device_manager=self.device_manager,
-                                                  on_frame_decoded=self._on_frame_decoded,
-                                                  debug=False)
-            self.device_controller = None
+            
+            self.device_controller = DeviceController(self.hdc_executor)
+            self.device_controller.bind_video_canvas(self.video_canvas)
+
+            self.server_deployer = ServerDeployer(
+                device_manager=self.device_manager,
+                on_deploy_finish=self._on_server_deploy_finish,
+            )
+            self.video_display = VideoDisplay(
+                root=self.root,
+                canvas=self.video_canvas,
+                device_controller=self.device_controller,
+                performance_label=self.performance_label
+            )
+            self.connection_manager = ConnectionManager(
+                device_manager=self.device_manager,
+                hdc_executor=self.hdc_executor,
+                on_frame_decoded=self.video_display.on_frame_decoded,
+                on_state_changed=self._on_connection_state_changed,
+                debug=False,
+            )
+            self.video_client = self.connection_manager.get_video_client()
+            self.video_display.connection_manager = self.connection_manager
+
             self._refresh_devices()
         threading.Thread(target=init, daemon=True).start()
+    
+    def _on_connection_state_changed(self, state: str) -> None:
+        """连接状态变化回调"""
+        self.is_connected = (state == ConnectionState.CONNECTED)
+        self.root.after(0, self._update_connection_ui)
+    
+    def _update_connection_ui(self) -> None:
+        """更新连接相关UI"""
+        if self.is_connected:
+            self.device_panel.set_connect_button_state("断开", "#e74c3c")
+            self.connection_status_label.config(text="已连接", fg="#2ecc71")
+        else:
+            self.device_panel.set_connect_button_state("连接", "#2ecc71")
+            self.connection_status_label.config(text="未连接", fg="#e74c3c")
+            self.performance_label.config(text="FPS: 0 | 帧数: 0")
     
     def _open_project_url(self, event: Optional[tk.Event] = None) -> None:
         """打开项目地址"""
@@ -244,145 +275,21 @@ class MainWindow:
                  font=("Microsoft YaHei", 9), width=10).pack(pady=(20, 0))
         about_window.focus_set()
     
-    def _on_frame_decoded(self, frame: np.ndarray) -> None:
-        """帧解码回调"""
-        self.current_frame = frame
-        self.frame_counter += 1
-        
-        current_time = time.time()
-        if current_time - self.last_fps_time >= 1.0:
-            self.fps = self.frame_counter
-            self.frame_counter = 0
-            self.last_fps_time = current_time
-            self.performance_label.config(text=f"FPS: {self.fps} | 帧数: {self.video_client.frame_count}")
-    
-    def _on_click(self, x: int, y: int) -> None:
-        """处理点击"""
-        pass
-    
-    def _on_drag(self, start_x: int, start_y: int, end_x: int, end_y: int) -> None:
-        """处理拖动"""
-        pass
-    
     def _update_video_display(self) -> None:
-        """更新视频显示"""
-        current_time = time.time()
-        
-        if self.is_connected and hasattr(self.video_client, 'last_data_time'):
-            time_since_last_data = current_time - self.video_client.last_data_time
-            if time_since_last_data > HEARTBEAT_TIMEOUT:
-                print_log(LogLevel.WARN, self.log_title, f"检测到心跳超时 ({time_since_last_data:.1f}秒)，断开连接")
-                self._disconnect_device()
-                return
-        
-        if current_time - self.last_display_time < 0.033:
-            self.root.after(10, self._update_video_display)
+        """更新视频显示（委托给 VideoDisplay）"""
+        if self.video_display is None:
             return
-        
-        self.last_display_time = current_time
-        
-        if not self.is_connected:
-            self.root.after(100, self._update_video_display)
-            return
-        
-        try:
-            import numpy as np
-            frame = self.video_client.get_current_frame(timeout=0.001)
-            if frame is None:
-                frame = self.current_frame
-            
-            if frame is not None:
-                self.displayed_frames += 1
-                
-                if self.last_print_frames != self.displayed_frames and self.displayed_frames % 100 == 0:
-                    self.last_print_frames = self.displayed_frames
-                    print_log(LogLevel.DEBUG, self.log_title, f"已显示 {self.displayed_frames} 帧，队列大小: {self.video_client.frame_queue.qsize()}")
-                
-                if self.displayed_frames - self.last_gc_frame_count >= self.gc_interval_frames:
-                    self.last_gc_frame_count = self.displayed_frames
-                
-                try:
-                    from PIL import Image
-                    pil_img = Image.fromarray(frame)
-                except Exception as e:
-                    print_log(LogLevel.ERROR, self.log_title, f"创建PIL图像失败: {e}")
-                    self.root.after(10, self._update_video_display)
-                    return
-                
-                if self.video_width != pil_img.width or self.video_height != pil_img.height:
-                    self.video_width = pil_img.width
-                    self.video_height = pil_img.height
-                    self.video_ratio = 0.0
-                    print_log(LogLevel.INFO, self.log_title, f"原始视频尺寸: {self.video_width}x{self.video_height}")
-                    
-                    self.canvas_width = self.video_canvas.winfo_width()
-                    self.canvas_height = self.video_canvas.winfo_height()
-                    print_log(LogLevel.INFO, self.log_title, f"画布尺寸: {self.canvas_width}x{self.canvas_height}")
-                    if self.canvas_width <= 10 or self.canvas_height <= 10:
-                        self.canvas_width = 800
-                        self.canvas_height = 600
-                    
-                    width_ratio = self.canvas_width / pil_img.width
-                    height_ratio = self.canvas_height / pil_img.height
-                    self.video_ratio = min(width_ratio, height_ratio)
-                    self.display_width = int(pil_img.width * self.video_ratio)
-                    self.display_height = int(pil_img.height * self.video_ratio)
-                    print_log(LogLevel.INFO, self.log_title, f"显示尺寸: {self.display_width}x{self.display_height} ratio:{self.video_ratio}")
-                    
-                    if self.device_controller:
-                        self.device_controller.set_display_resolution(self.display_width, self.display_height, self.video_ratio)
-                
-                try:
-                    pil_img_resized = pil_img.resize((self.display_width, self.display_height),
-                                                     Image.Resampling.LANCZOS)
-                except Exception as e:
-                    print_log(LogLevel.ERROR, self.log_title, f"缩放图像失败: {e}")
-                    pil_img_resized = pil_img
-                
-                x_offset = (self.canvas_width - self.display_width) // 2
-                y_offset = (self.canvas_height - self.display_height) // 2
-                
-                try:
-                    from PIL import ImageTk
-                    self.tk_image = ImageTk.PhotoImage(pil_img_resized)
-                    self.image_refs.clear()
-                    self.image_refs.append(self.tk_image)
-                except Exception as e:
-                    print_log(LogLevel.ERROR, self.log_title, f"创建Tkinter图像失败: {e}")
-                    self.root.after(10, self._update_video_display)
-                    return
-                
-                self.video_canvas.delete("all")
-                
-                self.video_canvas.create_image(
-                    x_offset, y_offset,
-                    anchor=tk.NW,
-                    image=self.tk_image
-                )
-                
-                if self.status_text_id:
-                    self.video_canvas.delete(self.status_text_id)
-                
-                status_text = f"帧数: {self.video_client.frame_count} | FPS: {self.fps} | 尺寸: {self.display_width}x{self.display_height}"
-                self.status_text_id = self.video_canvas.create_text(
-                    10, 10,
-                    anchor=tk.NW,
-                    text=status_text,
-                    fill="white",
-                    font=("Microsoft YaHei", 9),
-                    tags="status"
-                )
-                
-                self.video_canvas.update_idletasks()
-            
-        except Exception as e:
-            if self.is_connected:
-                print_log(LogLevel.ERROR, self.log_title, f"显示错误: {e}")
-        
-        self.root.after(10, self._update_video_display)
+        self.video_display._do_render()
     
     def _show_waiting_screen(self) -> None:
         """显示等待画面"""
+        if self.video_display is not None:
+            self.video_display.show_waiting_screen("等待连接设备...")
+        elif self.video_canvas is not None:
+            self._show_waiting_screen_direct("等待连接设备...")
+    
+    def _show_waiting_screen_direct(self, message: str) -> None:
+        """直接操作canvas显示等待画面（video_display未初始化时使用）"""
         self.video_canvas.delete("all")
         self.video_canvas.config(bg="#1a1a2e")
         
@@ -402,7 +309,7 @@ class MainWindow:
         
         self.running_status_text_id = self.video_canvas.create_text(
             canvas_width // 2, canvas_height // 2 + 10,
-            text="等待连接设备...",
+            text=message,
             fill="#3498db",
             font=("Microsoft YaHei", 12)
         )
@@ -418,10 +325,14 @@ class MainWindow:
     
     def _update_running_status(self, content: str) -> None:
         """更新运行状态"""
-        self.video_canvas.itemconfig(self.running_status_text_id, text=content)
+        if self.video_display is not None:
+            self.video_display.update_running_status(content)
     
     def _refresh_devices(self) -> None:
         """刷新设备"""
+        if self.device_manager is None or self.device_panel is None:
+            return
+        
         self._update_device_status("正在扫描设备...")
         devices = self.device_manager.discover_devices()
         display_names = [d.display_name() for d in devices]
@@ -444,21 +355,18 @@ class MainWindow:
             self._update_device_status("设备已断开，未发现其他设备")
             return
         
-        current_list = list(self.device_panel.device_combo['values'] or [])
         if current_selection and current_selection not in display_names:
             messagebox.showwarning("提示", "当前投屏设备已断开")
             self._disconnect_device()
-            if current_selection in current_list:
-                current_list.remove(current_selection)
-            self.device_panel.update_devices(current_list if current_list else display_names)
-            self._update_device_status(f"设备已断开，剩余 {len(current_list)} 个设备")
+            self.device_panel.update_devices(display_names)
+            self._update_device_status(f"设备已断开，发现 {len(display_names)} 个设备")
             return
         
         current_list = list(self.device_panel.device_combo['values'] or [])
         new_devices = [name for name in display_names if name not in current_list]
         
         if new_devices:
-            self.device_panel.update_devices(current_list + new_devices)
+            self.device_panel.update_devices(display_names, current_selection)
             self._update_device_status(f"发现 {len(new_devices)} 个新设备（投屏中）")
             print_log(LogLevel.INFO, self.log_title, f"新增设备: {new_devices}")
         else:
@@ -488,7 +396,6 @@ class MainWindow:
         selected_device = self.device_panel.get_selected_device()
         print_log(LogLevel.INFO, self.log_title, f"用户选择设备: {selected_device}")
         
-        # 情况1：正在投屏中
         if self.is_connected:
             current_device = self.device_manager.get_current_device()
             
@@ -496,15 +403,11 @@ class MainWindow:
                 print_log(LogLevel.WARN, self.log_title, f"投屏中但无法获取当前设备信息")
                 return
             
-            # 检查是否选择了同一设备
             if current_device.display_name() == selected_device:
                 print_log(LogLevel.INFO, self.log_title, f"选择了当前正在投屏的设备，保持投屏状态")
                 return
             
-            # 选择了不同设备，询问用户是否切换
             print_log(LogLevel.INFO, self.log_title, f"投屏中切换设备: {current_device.display_name()} -> {selected_device}")
-            
-            # 弹出确认对话框
             response = messagebox.askyesno(
                 "切换设备确认",
                 f"当前正在投屏设备:\n{current_device.display_name()}\n\n"
@@ -513,17 +416,14 @@ class MainWindow:
             )
             
             if not response:
-                # 用户不同意切换，恢复显示为当前投屏设备
                 print_log(LogLevel.INFO, self.log_title, f"用户取消切换，恢复设备选择显示")
                 self.device_panel.set_selected_device(current_device.display_name())
                 return
             
-            # 用户同意切换，继续后续流程（断开连接将在 _install_and_start_server_async 中执行）
             print_log(LogLevel.INFO, self.log_title, f"用户确认切换设备，准备断开当前连接")
         
-        # 情况2：未投屏，或投屏中用户同意切换
         print_log(LogLevel.INFO, self.log_title, f"投屏准备: 开始安装和启动服务端...")
-        threading.Thread(target=self._install_and_start_server_async, daemon=True).start()
+        self._install_and_start_server_async()
     
     def _on_server_deploy_finish(self, succ: bool, msg: str) -> None:
         """服务部署完成回调"""
@@ -535,112 +435,28 @@ class MainWindow:
         """异步安装并启动服务端"""
         was_connected = self.is_connected
         
-        # 只有在连接状态时才触发断开流程
+        # 切换设备时先断开旧连接
         if was_connected:
             print_log(LogLevel.INFO, self.log_title, f"断开当前设备连接...")
             self.is_connected = False
-            self.video_client.disconnect()
-            
-            self.image_refs.clear()
-            
-            self.device_controller = None
-            
-            print_log(LogLevel.INFO, self.log_title, f"连接已断开，准备切换到新设备")
-        
-        self._show_waiting_screen()
-        
-        self.device_panel.set_connect_button_state("连接", "#2ecc71")
-        
-        if was_connected:
-            self.connection_status_label.config(text="切换中...", fg="#f39c12")
-        else:
-            self.connection_status_label.config(text="未连接", fg="#e74c3c")
-        
-        self.performance_label.config(text="FPS: 0 | 帧数: 0")
-        
-        self.video_width = 0
-        self.video_height = 0
-        self.video_ratio = 0.0
-        self.display_width = 0
-        self.display_height = 0
+            self._disconnect_device()
         
         selected = self.device_panel.get_selected_device()
         if not selected:
             print_log(LogLevel.WARN, self.log_title, f"用户选择设备为空")
             return
         
-        target_device = None
-        for device in self.device_manager.devices:
-            if device.display_name() == selected:
-                target_device = device
-                break
-        
-        if not target_device or not self.device_manager.select_device(target_device.sn):
-            self._update_device_status("设备选择失败")
-            return
-        
-        self._update_running_status(f"[预安装] 正在获取可用转发端口，请稍等...")
-        port = self.device_manager.get_port_forwarding()
-        if port == -1:
-            print_log(LogLevel.ERROR, self.log_title, f"获取可用转发端口失败！")
-            self.root.after(0, self._on_server_deploy_finish, False, "获取可用转发端口失败！")
-            return
-        
-        self._update_running_status(f"[预安装] 正在安装服务端，请稍等...")
-        print_log(LogLevel.INFO, self.log_title, f"检查服务端安装状态...")
-        if not self.device_manager.check_server_installed():
-            print_log(LogLevel.INFO, self.log_title, f"服务端未安装，开始安装...")
-            
-            if not self.device_manager.install_server():
-                print_log(LogLevel.ERROR, self.log_title, f"服务端安装失败！")
-                self.root.after(0, self._on_server_deploy_finish, False, "服务端安装失败！")
-                return
-        else:
-            print_log(LogLevel.INFO, self.log_title, f"服务端已安装")
-        
-        self._update_running_status(f"[预安装] 正在启动服务端，请稍等...")
-        print_log(LogLevel.INFO, self.log_title, f"检查服务端运行状态...")
-        if not self.device_manager.check_server_running():
-            print_log(LogLevel.INFO, self.log_title, f"启动服务端...")
-            if not self.device_manager.start_server(port):
-                print_log(LogLevel.ERROR, self.log_title, f"服务端启动失败！")
-                self._update_running_status(f"[预安装] 启动服务端失败！")
-                self.root.after(0, self._on_server_deploy_finish, False, "服务端启动失败！")
-                return
-            
-            print_log(LogLevel.INFO, self.log_title, f"等待服务端就绪...")
-            time.sleep(1)
-        else:
-            print_log(LogLevel.INFO, self.log_title, f"服务端已在运行")
-        self._update_running_status(f"[预安装] 服务端已就绪，可随时点击[连接]开始投屏！")
+        self._show_waiting_screen()
+        self.device_panel.set_connect_button_state("连接", "#2ecc71")
         self.connection_status_label.config(text="未连接", fg="#e74c3c")
-    
-    def _install_and_start_server(self, port: int) -> bool:
-        """安装并启动服务端"""
-        print_log(LogLevel.INFO, self.log_title, f"检查服务端安装状态...")
-        if not self.device_manager.check_server_installed():
-            print_log(LogLevel.INFO, self.log_title, f"服务端未安装，开始安装...")
-            
-            if not self.device_manager.install_server():
-                messagebox.showerror("错误", "服务端安装失败！")
-                print_log(LogLevel.ERROR, self.log_title, f"服务端安装失败")
-                return False
-        else:
-            print_log(LogLevel.INFO, self.log_title, f"服务端已安装")
+        self.performance_label.config(text="FPS: 0 | 帧数: 0")
         
-        print_log(LogLevel.INFO, self.log_title, f"检查服务端运行状态...")
-        if not self.device_manager.check_server_running():
-            print_log(LogLevel.INFO, self.log_title, f"启动服务端...")
-            if not self.device_manager.start_server(port):
-                messagebox.showerror("错误", f"服务端启动失败！")
-                print_log(LogLevel.ERROR, self.log_title, f"服务端启动失败")
-                return False
-            
-            print_log(LogLevel.INFO, self.log_title, f"等待服务端就绪...")
-            time.sleep(1)
-        else:
-            print_log(LogLevel.INFO, self.log_title, f"服务端已在运行")
-        return True
+        self.server_deployer.deploy(
+            selected_device_name=selected,
+            devices=self.device_manager.devices,
+            update_running_status=self._update_running_status,
+            ui_callback=lambda f: self.root.after(0, f),
+        )
     
     def _connect_device(self) -> None:
         """连接设备"""
@@ -666,7 +482,10 @@ class MainWindow:
                 self.device_panel.set_connect_button_state("连接", "#2ecc71")
                 return
             
-            if not self._install_and_start_server(port):
+            # 复用或创建 ServerManager
+            self.connection_manager.ensure_server_manager(target_device.manufacturer, self.hdc_executor)
+            
+            if not self._install_and_start_server(port, self.connection_manager.get_server_manager()):
                 self.device_panel.set_connect_button_state("连接", "#2ecc71")
                 return
 
@@ -681,27 +500,22 @@ class MainWindow:
                 self._update_device_status(f"正在连接设备: {device.sn}...")
             
                 print_log(LogLevel.DEBUG, self.log_title, f"连接视频流服务器...")
-                if self.video_client.connect(HOST, port):
-                    config = self.video_client.config
-                    
-                    self.device_controller = DeviceController(self.hdc_executor)
-                    self.device_controller.bind_video_canvas(self.video_canvas)
-                    
+                if self.connection_manager.connect(port):
+                    config = self.connection_manager.get_video_client().config
                     self.is_connected = True
                     self.device_panel.set_connect_button_state("断开", "#e74c3c")
                     self.connection_status_label.config(text="已连接", fg="#2ecc71")
                     self.device_status_label.config(text=f"设备: {device.sn}")
                     
-                    self.displayed_frames = 0
-                    self.frame_counter = 0
-                    self.last_fps_time = time.time()
-                    self.last_print_frames = 0
+                    self.video_display.displayed_frames = 0
+                    self.video_display.frame_counter = 0
+                    self.video_display.last_fps_time = time.time()
+                    self.video_display.last_print_frames = 0
                     
                     self.video_canvas.delete("all")
                     self.video_canvas.config(bg="black")
                     
                     self._update_video_display()
-                    
                     self._update_device_status(f"连接成功！分辨率: {config.width}x{config.height}")
                 else:
                     self._update_device_status("连接失败")
@@ -722,29 +536,52 @@ class MainWindow:
         threading.Thread(target=connect_device_async, daemon=True).start()
         self.device_panel.set_connect_button_state("连接中", "#e74c3c")
     
+    def _install_and_start_server(self, port: int, server_manager) -> bool:
+        """安装并启动服务端"""
+        print_log(LogLevel.INFO, self.log_title, f"检查服务端安装状态...")
+        if not self.device_manager.check_server_installed(server_manager):
+            print_log(LogLevel.INFO, self.log_title, f"服务端未安装，开始安装...")
+            
+            if not self.device_manager.install_server(server_manager):
+                messagebox.showerror("错误", "服务端安装失败！")
+                print_log(LogLevel.ERROR, self.log_title, f"服务端安装失败")
+                return False
+        else:
+            print_log(LogLevel.INFO, self.log_title, f"服务端已安装")
+        
+        print_log(LogLevel.INFO, self.log_title, f"检查服务端运行状态...")
+        if not self.device_manager.check_server_running(server_manager):
+            print_log(LogLevel.INFO, self.log_title, f"启动服务端...")
+            if not self.device_manager.start_server(server_manager, port):
+                messagebox.showerror("错误", f"服务端启动失败！")
+                print_log(LogLevel.ERROR, self.log_title, f"服务端启动失败")
+                return False
+            
+            print_log(LogLevel.INFO, self.log_title, f"等待服务端就绪...")
+            time.sleep(1)
+        else:
+            print_log(LogLevel.INFO, self.log_title, f"服务端已在运行")
+        return True
+    
     def _disconnect_device(self) -> None:
         """断开设备"""
-        self.is_connected = False
-        self.video_client.disconnect()
+        if self.connection_manager is not None:
+            self.connection_manager.disconnect()
         
-        self.image_refs.clear()
+        if self.video_display is not None:
+            self.video_display.reset()
+                
+        if self.device_controller:
+            self.device_controller.reset()
         
         self._show_waiting_screen()
-        
         self.device_panel.set_connect_button_state("连接", "#2ecc71")
         self.connection_status_label.config(text="未连接", fg="#e74c3c")
         self.device_status_label.config(text="设备: 未连接")
         self.performance_label.config(text="FPS: 0 | 帧数: 0")
-        
-        self.video_width = 0
-        self.video_height = 0
-        self.video_ratio = 0.0
-        self.display_width = 0
-        self.display_height = 0
-        self.canvas_width = 800
-        self.canvas_height = 600
-        
-        self._force_garbage_collection()
+
+        if self.video_display is not None:
+            self.video_display.force_garbage_collection()
         self._update_device_status("设备已断开")
         print_log(LogLevel.INFO, self.log_title, "-"*60)
     
@@ -789,10 +626,11 @@ class MainWindow:
         debug_info_title = "调试信息"
         print_log(LogLevel.INFO, debug_info_title, f"\n======== 调试信息 ========")
         print_log(LogLevel.INFO, debug_info_title, f"连接状态: {self.is_connected}")
-        print_log(LogLevel.INFO, debug_info_title, f"当前fps: {self.fps}")
-        print_log(LogLevel.INFO, debug_info_title, f"已显示帧数: {self.displayed_frames}")
-        print_log(LogLevel.INFO, debug_info_title, f"视频尺寸: {self.video_width}x{self.video_height}")
-        print_log(LogLevel.INFO, debug_info_title, f"图像引用数: {len(self.image_refs)}")
+        if self.video_display:
+            print_log(LogLevel.INFO, debug_info_title, f"当前fps: {self.video_display.fps}")
+            print_log(LogLevel.INFO, debug_info_title, f"已显示帧数: {self.video_display.displayed_frames}")
+            print_log(LogLevel.INFO, debug_info_title, f"视频尺寸: {self.video_display.video_width}x{self.video_display.video_height}")
+            print_log(LogLevel.INFO, debug_info_title, f"图像引用数: {len(self.video_display.image_refs)}")
         
         if self.video_client:
             print_log(LogLevel.INFO, debug_info_title, f"总接收帧数: {self.video_client.frame_count}")
@@ -821,7 +659,7 @@ class MainWindow:
     def _save_debug_frame(self) -> None:
         """保存当前帧用于调试"""
         debug_frame_title = "保存调试帧"
-        if self.current_frame is not None:
+        if self.video_display is not None and self.video_display.current_frame is not None:
             try:
                 from PIL import Image
                 debug_dir = "debug_frames"
@@ -830,7 +668,7 @@ class MainWindow:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = os.path.join(debug_dir, f"debug_{timestamp}.png")
                 
-                pil_img = Image.fromarray(self.current_frame)
+                pil_img = Image.fromarray(self.video_display.current_frame)
                 pil_img.save(filename)
                 
                 print_log(LogLevel.INFO, debug_frame_title, f"调试帧保存在: {filename}")
@@ -851,9 +689,10 @@ class MainWindow:
         
         debug_info = []
         debug_info.append(f"连接状态: {self.is_connected}")
-        debug_info.append(f"当前fps: {self.fps}")
-        debug_info.append(f"已显示帧数: {self.displayed_frames}")
-        debug_info.append(f"视频尺寸: {self.video_width}x{self.video_height}")
+        if self.video_display:
+            debug_info.append(f"当前fps: {self.video_display.fps}")
+            debug_info.append(f"已显示帧数: {self.video_display.displayed_frames}")
+            debug_info.append(f"视频尺寸: {self.video_display.video_width}x{self.video_display.video_height}")
         
         if self.video_client:
             debug_info.append(f"总接收帧数: {self.video_client.frame_count}")
@@ -876,15 +715,6 @@ class MainWindow:
         text_widget.insert(tk.END, "\n".join(debug_info))
         text_widget.config(state=tk.DISABLED)
     
-    def _force_garbage_collection(self) -> None:
-        """强制垃圾回收"""
-        def _async_garbage_collection_func() -> None:
-            print_log(LogLevel.INFO, self.log_title, f"强制垃圾回收...")
-            collected = gc.collect()
-            print_log(LogLevel.INFO, self.log_title, f"回收了 {collected} 个对象")
-        
-        threading.Thread(target=_async_garbage_collection_func, daemon=True).start()
-    
     def _update_device_status(self, message: str) -> None:
         """更新状态"""
         self.status_label.config(text=message)
@@ -900,11 +730,6 @@ class MainWindow:
             if self.video_client:
                 self.video_client.disconnect()
             self.root.destroy()
-    
-    def _on_window_resize(self, event: tk.Event) -> None:
-        """窗口大小改变"""
-        print_log(LogLevel.DEBUG, self.log_title, f"窗口大小变化: {event.width}x{event.height}")
-        self.video_ratio = 0.0
     
     def run(self) -> None:
         """运行"""

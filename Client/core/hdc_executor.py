@@ -196,10 +196,10 @@ class HDCCommandExecutor:
             try:
                 process.terminate()
                 process.wait(timeout=1)
-            except:
+            except (OSError, subprocess.SubprocessError):
                 try:
                     process.kill()
-                except:
+                except (OSError, subprocess.SubprocessError):
                     pass
             finally:
                 if process_id in self.async_processes:
@@ -246,8 +246,7 @@ class HDCCommandExecutor:
                     activate
                 end tell
                 '''
-                cmd = " ".join(["osascript", "-e", applescript])
-                process = subprocess.Popen()
+                process = subprocess.Popen(["osascript", "-e", applescript])
             else:
                 term_cmd = os.environ.get('TERMINAL', 'xterm')
                 shell_cmd = " ".join([term_cmd, "-e", f"bash -c '{shell_cmd}'"])
@@ -265,6 +264,7 @@ class HDCCommandExecutor:
     def set_device(self, device_sn: str) -> None:
         """设置当前设备"""
         self.device_sn = device_sn
+        print_log(LogLevel.INFO, self.log_title, f"设置设备: [{device_sn}]")
     
     def get_current_device(self) -> Optional[str]:
         """获取当前设备"""

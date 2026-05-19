@@ -164,10 +164,10 @@ class ServerManager:
                 self.server_process.terminate()
                 self.server_process.wait(timeout=1)
                 print_log(LogLevel.INFO, self.log_title, f"服务进程已停止")
-            except:
+            except (OSError, subprocess.TimeoutExpired):
                 try:
                     self.server_process.kill()
-                except:
+                except (OSError, subprocess.SubprocessError):
                     pass
             finally:
                 self.server_process = None
