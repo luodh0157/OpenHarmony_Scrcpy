@@ -5,15 +5,15 @@
 """
 
 import sys
-import os
-
 from unittest.mock import MagicMock
 
-def pytest_configure(config):
-    # 将 tkinter 和 ttk 整个模块替换为 MagicMock
-    sys.modules['_tkinter'] = MagicMock()
-    sys.modules['tkinter'] = MagicMock()
-    sys.modules['tkinter.ttk'] = MagicMock()
+# 将 tkinter 和 ttk 整个模块替换为 MagicMock
+sys.modules['_tkinter'] = MagicMock()
+sys.modules['tkinter'] = MagicMock()
+sys.modules['tkinter.ttk'] = MagicMock()
+
+import os
+import pytest
 
 # 获取项目根目录
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
