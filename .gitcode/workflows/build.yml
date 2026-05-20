@@ -20,11 +20,6 @@ jobs:
         with:
           python-version: '3.8.18'
 
-      #- name: Install system dependencies (FFmpeg for PyAV)
-      #  run: |
-      #    cd repo_workspace
-      #    yum install -y ffmpeg ffmpeg-devel
-
       - name: Configure pip mirror
         run: |
           mkdir -p ~/.pip
@@ -42,12 +37,12 @@ jobs:
       - name: Run pytest with coverage
         run: |
           cd repo_workspace
-          pytest tests/ -v --tb=short --cov=Client --cov-report=term-missing
+          python -m pytest tests/ -v --tb=short --cov=Client --cov-report=term-missing
 
       - name: Run type check (mypy)
         run: |
           cd repo_workspace
-          mypy Client/ --ignore-missing-imports --no-error-summary || true
+          python -m mypy Client/ --ignore-missing-imports --no-error-summary || true
   
   build-executer:
     runs-on: euleros-2.10.1
@@ -69,7 +64,6 @@ jobs:
       - name: Install system dependencies
         run: |
           cd repo_workspace
-          # yum install -y ffmpeg ffmpeg-devel
           pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
@@ -99,12 +93,12 @@ jobs:
             exit 1
           fi
 
-      #- name: Upload Executer artifact
-      #  uses: upload-artifact@0.0.1
-      #  with:
-      #    name: OHScrcpy-Executer-Linux-x64
-      #    paths: repo_workspace/Package/Executer/output/Linux/x64/
-      #    retention-days: 30
+      - name: Upload Executer artifact
+        uses: upload-artifact@0.0.1
+        with:
+          name: OHScrcpy-Executer-Linux-x64
+          paths: repo_workspace/Package/Executer/output/Linux/x64/
+          retention-days: 30
 
   build-installer:
     runs-on: euleros-2.10.1
@@ -126,7 +120,6 @@ jobs:
       - name: Install system dependencies
         run: |
           cd repo_workspace
-          #  yum install -y ffmpeg ffmpeg-devel zip
           pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
@@ -156,9 +149,9 @@ jobs:
             exit 1
           fi
 
-      #- name: Upload Installer artifact
-      #  uses: upload-artifact@0.0.1
-      #  with:
-      #    name: OHScrcpy-Installer-Linux-x64
-      #    paths: repo_workspace/Package/Installer/output/Linux/x64/
-      #    retention-days: 30
+      - name: Upload Installer artifact
+        uses: upload-artifact@0.0.1
+        with:
+          name: OHScrcpy-Installer-Linux-x64
+          paths: repo_workspace/Package/Installer/output/Linux/x64/
+          retention-days: 30
