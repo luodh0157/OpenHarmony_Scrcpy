@@ -55,7 +55,7 @@ jobs:
       - name: Install system dependencies
         run: |
           cd repo_workspace
-        # yum install -y ffmpeg ffmpeg-devel
+          # yum install -y ffmpeg ffmpeg-devel
           pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
@@ -105,7 +105,7 @@ jobs:
       - name: Install system dependencies
         run: |
           cd repo_workspace
-        #  yum install -y ffmpeg ffmpeg-devel zip
+          #  yum install -y ffmpeg ffmpeg-devel zip
           pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
