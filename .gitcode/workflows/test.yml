@@ -18,10 +18,10 @@ jobs:
         with:
           python-version: '3.8.18'
 
-      - name: Install system dependencies (FFmpeg for PyAV)
-        run: |
-          cd repo_workspace
-          yum install -y ffmpeg ffmpeg-devel
+      #- name: Install system dependencies (FFmpeg for PyAV)
+      #  run: |
+      #    cd repo_workspace
+      #    yum install -y ffmpeg ffmpeg-devel
 
       - name: Install test dependencies
         run: |
