@@ -47,6 +47,7 @@ jobs:
       - name: Configure pip mirror
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           mkdir -p ~/.pip
           echo "[global]" > ~/.pip/pip.conf
           echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
@@ -55,6 +56,7 @@ jobs:
       - name: Install test dependencies
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           pip install --upgrade pip
           pip install -r tests/requirements-test.txt
           pip install -r Client/requirements.txt
@@ -62,11 +64,13 @@ jobs:
       - name: Run pytest with coverage
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           python -m pytest tests/ -v --tb=short --cov=Client --cov-report=term-missing
 
       - name: Run type check (mypy)
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           python -m mypy Client/ --ignore-missing-imports --no-error-summary || true
   
   build-executer:
@@ -106,6 +110,7 @@ jobs:
       - name: Configure pip mirror
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           mkdir -p ~/.pip
           echo "[global]" > ~/.pip/pip.conf
           echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
@@ -114,12 +119,14 @@ jobs:
       - name: Install system dependencies
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
 
       - name: Build Executer
         run: |
+          source $HOME/miniconda/bin/activate py311
           cd repo_workspace/Package
           chmod +x build_executer.sh
           ./build_executer.sh
@@ -127,6 +134,7 @@ jobs:
       - name: Check Executer output
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           OUTPUT_DIR="Package/Executer/output/Linux/x64"
           if [ -d "$OUTPUT_DIR" ]; then
             echo "Checking Executer output at: $OUTPUT_DIR"
@@ -187,6 +195,7 @@ jobs:
       - name: Configure pip mirror
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           mkdir -p ~/.pip
           echo "[global]" > ~/.pip/pip.conf
           echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
@@ -195,12 +204,14 @@ jobs:
       - name: Install system dependencies
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
 
       - name: Build Installer
         run: |
+          source $HOME/miniconda/bin/activate py311
           cd repo_workspace/Package
           chmod +x build_installer.sh
           ./build_installer.sh
@@ -208,6 +219,7 @@ jobs:
       - name: Check Installer output
         run: |
           cd repo_workspace
+          source $HOME/miniconda/bin/activate py311
           OUTPUT_DIR="Package/Installer/output/Linux/x64"
           if [ -d "$OUTPUT_DIR" ]; then
             echo "Checking Installer output at: $OUTPUT_DIR"
