@@ -6,7 +6,7 @@ set PROJECT_DIR=%SCRIPT_DIR%..
 
 cd /d "%PROJECT_DIR%"
 
-REM ç¦æ­¢ç”ŸæˆPythonå­—èŠ‚ç ç¼“å­˜ï¼Œé¿å… __pycache__ ç›®å½•æ±¡æŸ“ä»£ç ä»“åº“
+REM ½ûÖ¹Éú³ÉPython×Ö½ÚÂë»º´æ£¬±ÜÃâ __pycache__ Ä¿Â¼ÎÛÈ¾´úÂë²Ö¿â
 set PYTHONDONTWRITEBYTECODE=1
 
 echo ==========================================
@@ -28,14 +28,20 @@ echo ==========================================
 echo Running Tests...
 echo ==========================================
 
-python -m pytest tests\ -v --tb=short
+python -m pytest tests\test_decoder.py -v --tb=short
+python -m pytest tests\test_device_manager.py -v --tb=short
+python -m pytest tests\test_fixtures.py -v --tb=short
+python -m pytest tests\test_hdc_executor.py -v --tb=short
+python -m pytest tests\test_protocol.py -v --tb=short
+python -m pytest tests\test_server_manager.py -v --tb=short
+python -m pytest tests\test_stream_client.py -v --tb=short
 
 echo.
 echo ==========================================
 echo Tests Complete
 echo ==========================================
 
-REM æ¸…ç†å¯èƒ½é—ç•™çš„ç¼“å­˜ç›®å½•ï¼ˆä¿é™©æœºåˆ¶ï¼‰
+REM ÇåÀí¿ÉÄÜÒÅÁôµÄ»º´æÄ¿Â¼£¨±£ÏÕ»úÖÆ£©
 echo.
 echo Cleaning up cache directories...
 for /d /r tests %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d" 2>nul

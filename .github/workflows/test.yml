@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-unit:
-    name: Unit Tests
+  test-all:
+    name: OHScrcpy All Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

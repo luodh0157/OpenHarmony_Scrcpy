@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, master]
     tags:
-      - 'v*'
+      - 'OpenHarmony_Scrcpy_V*'
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -16,7 +16,7 @@ concurrency:
 jobs:
   # ==================== 测试阶段 ====================
   test:
-    name: Run Tests
+    name: Run All Tests
     uses: ./.github/workflows/test.yml
 
   # ==================== Executer 构建（Matrix）====================
@@ -214,9 +214,7 @@ jobs:
   # ==================== 发布 Release（仅 tag 时触发）====================
   create-release:
     name: Create GitHub Release
-    needs:
-      - build-executer
-      - build-installer
+    needs: [build-executer, build-installer]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/OpenHarmony_Scrcpy_V')
     timeout-minutes: 15

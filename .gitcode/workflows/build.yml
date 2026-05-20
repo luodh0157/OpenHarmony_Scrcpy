@@ -4,27 +4,33 @@ on:
   push:
     branches: [ "main", "master" ]
     tags:
-      - 'v*'
+      - 'OpenHarmony_Scrcpy_V*'
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Run All Tests
+    uses: ./.gitcode/workflows/test.yml
+  
   build-executer:
     runs-on: euleros-2.10.1
+    needs: test
     steps:
       - uses: checkout-action@0.0.1
 
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
-          python-version: '3.11'
+          python-version: '3.8.18'
 
       - name: Install system dependencies
         run: |
+          cd repo_workspace
           yum install -y ffmpeg ffmpeg-devel
           pip install --upgrade pip
-          pip install -r repo_workspace/Client/requirements.txt
+          pip install -r Client/requirements.txt
           pip install pyinstaller
 
       - name: Build Executer
@@ -33,17 +39,22 @@ jobs:
           chmod +x build_executer.sh
           ./build_executer.sh
 
-      - name: Test executable
+      - name: Check Executer output
         run: |
-          exePath="repo_workspace/Package/Executer/output/Linux/x64/OHScrcpy"
-          if [ -f "$exePath" ]; then
-            echo "Testing executable at: $exePath"
-            chmod +x "$exePath"
-            "$exePath" --help 2>&1 | head -10 || true
-            echo "Executable test completed"
+          cd repo_workspace
+          OUTPUT_DIR="Package/Executer/output/Linux/x64"
+          if [ -d "$OUTPUT_DIR" ]; then
+            echo "Checking Executer output at: $OUTPUT_DIR"
+            ls -la "$OUTPUT_DIR"
+            ZIP_COUNT=$(find "$OUTPUT_DIR" -name "*.zip" -o -name "*.exe" | wc -l)
+            if [ "$ZIP_COUNT" -gt 0 ]; then
+              echo "Executer package found"
+            else
+              echo "::error::No Executer package found in $OUTPUT_DIR"
+              exit 1
+            fi
           else
-            echo "Error: Executable not found at $exePath"
-            ls -la "repo_workspace/Package/Executer/output/Linux/x64/" || true
+            echo "::error::Output directory not found: $OUTPUT_DIR"
             exit 1
           fi
 
@@ -51,24 +62,26 @@ jobs:
         uses: upload-artifact@0.0.1
         with:
           name: OHScrcpy-Executer-Linux-x64
-          path: repo_workspace/Package/Executer/output/Linux/x64/
+          paths: repo_workspace/Package/Executer/output/Linux/x64/
           retention-days: 30
 
   build-installer:
     runs-on: euleros-2.10.1
+    needs: test
     steps:
       - uses: checkout-action@0.0.1
 
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
-          python-version: '3.11'
+          python-version: '3.8.18'
 
       - name: Install system dependencies
         run: |
+          cd repo_workspace
           yum install -y ffmpeg ffmpeg-devel zip
           pip install --upgrade pip
-          pip install -r repo_workspace/Client/requirements.txt
+          pip install -r Client/requirements.txt
           pip install pyinstaller
 
       - name: Build Installer
@@ -77,21 +90,22 @@ jobs:
           chmod +x build_installer.sh
           ./build_installer.sh
 
-      - name: Test installer output
+      - name: Check Installer output
         run: |
-          outputDir="repo_workspace/Package/Installer/output/Linux/x64"
-          if [ -d "$outputDir" ]; then
-            echo "Checking installer output at: $outputDir"
-            ls -la "$outputDir"
-            zipCount=$(find "$outputDir" -name "*.zip" | wc -l)
-            if [ "$zipCount" -gt 0 ]; then
-              echo "Installer package found"
+          cd repo_workspace
+          OUTPUT_DIR="Package/Installer/output/Linux/x64"
+          if [ -d "$OUTPUT_DIR" ]; then
+            echo "Checking Installer output at: $OUTPUT_DIR"
+            ls -la "$OUTPUT_DIR"
+            ZIP_COUNT=$(find "$OUTPUT_DIR" -name "*.zip" -o -name "*.exe" | wc -l)
+            if [ "$ZIP_COUNT" -gt 0 ]; then
+              echo "Executer package found"
             else
-              echo "Error: No installer package found in $outputDir"
+              echo "::error::No Installer package found in $OUTPUT_DIR"
               exit 1
             fi
           else
-            echo "Error: Output directory not found: $outputDir"
+            echo "::error::Output directory not found: $OUTPUT_DIR"
             exit 1
           fi
 
@@ -99,5 +113,5 @@ jobs:
         uses: upload-artifact@0.0.1
         with:
           name: OHScrcpy-Installer-Linux-x64
-          path: repo_workspace/Package/Installer/output/Linux/x64/
+          paths: repo_workspace/Package/Installer/output/Linux/x64/
           retention-days: 30

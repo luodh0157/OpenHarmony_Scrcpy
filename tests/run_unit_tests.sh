@@ -52,7 +52,13 @@ echo "=========================================="
 echo "Running Tests..."
 echo "=========================================="
 
-$PYTHON_CMD -m pytest tests/ -v --tb=short
+$PYTHON_CMD -m pytest tests/test_decoder.py -v --tb=short
+$PYTHON_CMD -m pytest tests/test_device_manager.py -v --tb=short
+$PYTHON_CMD -m pytest tests/test_fixtures.py -v --tb=short
+$PYTHON_CMD -m pytest tests/test_hdc_executor.py -v --tb=short
+$PYTHON_CMD -m pytest tests/test_protocol.py -v --tb=short
+$PYTHON_CMD -m pytest tests/test_server_manager.py -v --tb=short
+$PYTHON_CMD -m pytest tests/test_stream_client.py -v --tb=short
 
 echo ""
 echo "=========================================="

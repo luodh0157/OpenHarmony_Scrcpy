@@ -5,9 +5,10 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_call:
 
 jobs:
-  test:
+  test-all:
     runs-on: euleros-2.10.1
     steps:
       - uses: checkout-action@0.0.1
@@ -15,10 +16,11 @@ jobs:
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
-          python-version: '3.11'
+          python-version: '3.8.18'
 
       - name: Install system dependencies (FFmpeg for PyAV)
         run: |
+          cd repo_workspace
           yum install -y ffmpeg ffmpeg-devel
 
       - name: Install test dependencies
