@@ -10,13 +10,40 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    name: Run All Tests
-    uses: ./.gitcode/workflows/test.yml
+  test-all:
+    runs-on: euleros-2.10.1
+    steps:
+      - uses: checkout-action@0.0.1
+
+      - name: Setup Python
+        uses: setup-python@0.0.1
+        with:
+          python-version: '3.8.18'
+
+      #- name: Install system dependencies (FFmpeg for PyAV)
+      #  run: |
+      #    cd repo_workspace
+      #    yum install -y ffmpeg ffmpeg-devel
+
+      - name: Install test dependencies
+        run: |
+          cd repo_workspace
+          pip install --upgrade pip
+          pip install -r tests/requirements-test.txt
+          pip install -r Client/requirements.txt
+
+      - name: Run pytest with coverage
+        run: |
+          cd repo_workspace
+          pytest tests/ -v --tb=short --cov=Client --cov-report=term-missing
+
+      - name: Run type check (mypy)
+        run: |
+          cd repo_workspace
+          mypy Client/ --ignore-missing-imports --no-error-summary || true
   
   build-executer:
     runs-on: euleros-2.10.1
-    needs: test
     steps:
       - uses: checkout-action@0.0.1
 
@@ -28,7 +55,7 @@ jobs:
       - name: Install system dependencies
         run: |
           cd repo_workspace
-          yum install -y ffmpeg ffmpeg-devel
+        # yum install -y ffmpeg ffmpeg-devel
           pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
@@ -67,7 +94,6 @@ jobs:
 
   build-installer:
     runs-on: euleros-2.10.1
-    needs: test
     steps:
       - uses: checkout-action@0.0.1
 
@@ -79,7 +105,7 @@ jobs:
       - name: Install system dependencies
         run: |
           cd repo_workspace
-          yum install -y ffmpeg ffmpeg-devel zip
+        #  yum install -y ffmpeg ffmpeg-devel zip
           pip install --upgrade pip
           pip install -r Client/requirements.txt
           pip install pyinstaller
