@@ -15,10 +15,34 @@ jobs:
     steps:
       - uses: checkout-action@0.0.1
 
-      - name: Setup Python
-        uses: setup-python@0.0.1
-        with:
-          python-version: '3.8.18'
+      #- name: Setup Python
+      #  uses: setup-python@0.0.1
+      #  with:
+      #    python-version: '3.8.18'
+
+      - name: Install Python via Miniconda
+        run: |
+          # 1. 下载 Miniconda 安装包（从清华大学镜像站，真实有效）
+          curl -O https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh
+  
+          # 2. 安装 Miniconda（静默模式，安装到 $HOME/miniconda）
+          bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+  
+          # 3. 配置环境变量，使 conda 立即生效
+          export PATH="$HOME/miniconda/bin:$PATH"
+  
+          # 4. 配置 conda 使用清华镜像源（加速后续包下载）
+          conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
+          conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/
+          conda config --set show_channel_urls yes
+  
+          # 5. 创建一个名为 py311 的 Python 3.11 环境，并激活
+          conda create -n py311 python=3.11.9 -y
+          source activate py311
+  
+          # 6. 验证
+          python --version
+          python -c "import sysconfig; print(sysconfig.get_config_var('Py_ENABLE_SHARED'))"
 
       - name: Configure pip mirror
         run: |
