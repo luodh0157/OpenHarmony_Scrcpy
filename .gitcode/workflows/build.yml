@@ -18,10 +18,11 @@ jobs:
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
-          python-version: '3.7'
+          python-version: '3.8.18'
 
       - name: Configure pip mirror
         run: |
+          cd repo_workspace
           mkdir -p ~/.pip
           echo "[global]" > ~/.pip/pip.conf
           echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
@@ -52,10 +53,11 @@ jobs:
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
-          python-version: '3.7'
+          python-version: '3.8.18'
 
       - name: Configure pip mirror
         run: |
+          cd repo_workspace
           mkdir -p ~/.pip
           echo "[global]" > ~/.pip/pip.conf
           echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
@@ -108,10 +110,11 @@ jobs:
       - name: Setup Python
         uses: setup-python@0.0.1
         with:
-          python-version: '3.7'
+          python-version: '3.8.18'
 
       - name: Configure pip mirror
         run: |
+          cd repo_workspace
           mkdir -p ~/.pip
           echo "[global]" > ~/.pip/pip.conf
           echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
