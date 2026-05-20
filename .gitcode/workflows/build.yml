@@ -25,6 +25,13 @@ jobs:
       #    cd repo_workspace
       #    yum install -y ffmpeg ffmpeg-devel
 
+      - name: Configure pip mirror
+        run: |
+          mkdir -p ~/.pip
+          echo "[global]" > ~/.pip/pip.conf
+          echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
+          echo "timeout = 120" >> ~/.pip/pip.conf
+      
       - name: Install test dependencies
         run: |
           cd repo_workspace
@@ -51,6 +58,13 @@ jobs:
         uses: setup-python@0.0.1
         with:
           python-version: '3.8.18'
+
+      - name: Configure pip mirror
+        run: |
+          mkdir -p ~/.pip
+          echo "[global]" > ~/.pip/pip.conf
+          echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
+          echo "timeout = 120" >> ~/.pip/pip.conf
 
       - name: Install system dependencies
         run: |
@@ -101,6 +115,13 @@ jobs:
         uses: setup-python@0.0.1
         with:
           python-version: '3.8.18'
+
+      - name: Configure pip mirror
+        run: |
+          mkdir -p ~/.pip
+          echo "[global]" > ~/.pip/pip.conf
+          echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
+          echo "timeout = 120" >> ~/.pip/pip.conf
 
       - name: Install system dependencies
         run: |
