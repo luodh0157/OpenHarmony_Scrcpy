@@ -85,12 +85,12 @@ jobs:
             exit 1
           fi
 
-      - name: Upload Executer artifact
-        uses: upload-artifact@0.0.1
-        with:
-          name: OHScrcpy-Executer-Linux-x64
-          paths: repo_workspace/Package/Executer/output/Linux/x64/
-          retention-days: 30
+      #- name: Upload Executer artifact
+      #  uses: upload-artifact@0.0.1
+      #  with:
+      #    name: OHScrcpy-Executer-Linux-x64
+      #    paths: repo_workspace/Package/Executer/output/Linux/x64/
+      #    retention-days: 30
 
   build-installer:
     runs-on: euleros-2.10.1
@@ -135,9 +135,9 @@ jobs:
             exit 1
           fi
 
-      - name: Upload Installer artifact
-        uses: upload-artifact@0.0.1
-        with:
-          name: OHScrcpy-Installer-Linux-x64
-          paths: repo_workspace/Package/Installer/output/Linux/x64/
-          retention-days: 30
+      #- name: Upload Installer artifact
+      #  uses: upload-artifact@0.0.1
+      #  with:
+      #    name: OHScrcpy-Installer-Linux-x64
+      #    paths: repo_workspace/Package/Installer/output/Linux/x64/
+      #    retention-days: 30
