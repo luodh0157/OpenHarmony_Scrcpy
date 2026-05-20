@@ -1,10 +1,6 @@
 name: Test OpenHarmony OHScrcpy
 
 on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_call:
 
 jobs:
@@ -22,7 +18,14 @@ jobs:
       #  run: |
       #    cd repo_workspace
       #    yum install -y ffmpeg ffmpeg-devel
-
+      
+      - name: Configure pip mirror
+        run: |
+          mkdir -p ~/.pip
+          echo "[global]" > ~/.pip/pip.conf
+          echo "index-url = https://pypi.tuna.tsinghua.edu.cn/simple" >> ~/.pip/pip.conf
+          echo "timeout = 120" >> ~/.pip/pip.conf
+      
       - name: Install test dependencies
         run: |
           cd repo_workspace
