@@ -31,9 +31,9 @@ jobs:
       - name: Run pytest with coverage
         run: |
           cd repo_workspace
-          pytest tests/ -v --tb=short --cov=Client --cov-report=term-missing
+          python -m pytest tests/ -v --tb=short --cov=Client --cov-report=term-missing
 
       - name: Run type check (mypy)
         run: |
           cd repo_workspace
-          mypy Client/ --ignore-missing-imports --no-error-summary || true
+          python -m mypy Client/ --ignore-missing-imports --no-error-summary || true
