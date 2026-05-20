@@ -14,13 +14,6 @@ jobs:
         with:
           python-version: '3.8.18'
 
-      - name: Install system dependencies (FFmpeg for PyAV)
-        run: |
-          cd repo_workspace
-          yum install -y epel-release
-          yum makecache
-          yum install -y ffmpeg ffmpeg-devel
-      
       - name: Configure pip mirror
         run: |
           mkdir -p ~/.pip
@@ -35,6 +28,13 @@ jobs:
           pip install -r tests/requirements-test.txt
           pip install -r Client/requirements.txt
 
+      - name: Install system dependencies (FFmpeg for PyAV)
+        run: |
+          cd repo_workspace
+          yum install -y epel-release
+          yum makecache
+          yum install -y ffmpeg ffmpeg-devel
+      
       - name: Run pytest with coverage
         run: |
           cd repo_workspace
