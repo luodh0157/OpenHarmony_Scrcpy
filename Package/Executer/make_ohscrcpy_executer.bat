@@ -1,5 +1,5 @@
 REM Copyright (c) 2026 luodh0157.
-REM Licensed under the Apache License, Version 2.0 (the "License").
+REM Licensed under the Apache License, Version 2.0 (the "License");
 REM you may not use this file except in compliance with the License.
 REM You may obtain a copy of the License at
 REM
@@ -161,19 +161,19 @@ if not exist app.ico (
 )
 
 if not exist hdc\Windows\%ARCH%\hdc.exe (
-    echo -----------------------------------------------------------
+    echo ------------------------------------------------------------
     echo [警告] 未找到 hdc\Windows\%ARCH%\hdc.exe，请确保该文件存在
-    echo -----------------------------------------------------------
+    echo ------------------------------------------------------------
     ping 127.0.0.1 -n 6 >nul
     exit /b 1
 )
 
 if not exist hdc\Windows\%ARCH%\libusb_shared.dll (
-    echo ---------------------------------------------------------------------
-    echo [警告] 未找到 hdc\Windows\%ARCH%\libusb_shared.dll，请确保该文件存在
-    echo ---------------------------------------------------------------------
-    ping 127.0.0.1 -n 6 >nul
-    exit /b 1
+echo ----------------------------------------------------------------------
+echo [警告] 未找到 hdc\Windows\%ARCH%\libusb_shared.dll，请确保该文件存在
+echo ----------------------------------------------------------------------
+ping 127.0.0.1 -n 6 >nul
+exit /b 1
 )
 
 echo *****************************
@@ -194,7 +194,7 @@ echo *****************************
 echo ******************************
 echo [信息] 开始PyInstaller打包...
 echo ******************************
-pyinstaller .\main.py --name "OHScrcpy" --noconfirm --clean --windowed --console --onefile --hidden-import core --hidden-import core.constants --hidden-import core.exceptions --hidden-import core.logger --hidden-import core.hdc_executor --hidden-import core.server_manager --hidden-import core.device_manager --hidden-import video --hidden-import video.config --hidden-import video.decoder --hidden-import video.stream_client --hidden-import gui --hidden-import gui.device_controller --hidden-import utils --hidden-import utils.platform_utils --add-data "ohscrcpy_server:." --add-data "ohscrcpy_server.cfg:." --add-data "HUAWEI\ohscrcpy_server:HUAWEI" --add-data "hdc\Windows\%ARCH%\hdc.exe:." --add-data "hdc\Windows\%ARCH%\libusb_shared.dll:." --icon app.ico
+python -m PyInstaller .\main.py --name "OHScrcpy" --noconfirm --clean --windowed --console --onefile --collect-submodules core --collect-submodules video --collect-submodules gui --collect-submodules utils --add-data "ohscrcpy_server:." --add-data "ohscrcpy_server.cfg:." --add-data "HUAWEI\ohscrcpy_server:HUAWEI" --add-data "hdc\Windows\%ARCH%\hdc.exe:." --add-data "hdc\Windows\%ARCH%\libusb_shared.dll:." --add-data "config\log_config.json:config" --icon app.ico
 if %errorlevel% neq 0 (
     echo ---------------------------
     echo [错误] PyInstaller打包失败

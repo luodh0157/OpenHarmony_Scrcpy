@@ -1,10 +1,6 @@
 name: Test OpenHarmony OHScrcpy
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_call:
 
 concurrency:
@@ -29,11 +25,6 @@ jobs:
           cache-dependency-path: |
             Client/requirements.txt
             tests/requirements-test.txt
-
-      - name: Install system dependencies (FFmpeg for PyAV)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev
 
       - name: Install test dependencies
         run: |

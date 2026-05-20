@@ -74,9 +74,9 @@ esac
 echo "[信息] 检测到操作系统: ${OS_TYPE}, 架构：${ARCH}"
 
 if ! command -v python3 &> /dev/null; then
-    echo "-----------------------------------------"
+    echo "-----------------------------------------------------"
     echo -e "\033[31m[错误] 未找到Python3，请先安装Python 3.7+\033[0m"
-    echo "-----------------------------------------"
+    echo "-----------------------------------------------------"
     
     if [ "${OS_TYPE}" = "macOS" ]; then
         echo "对于macOS，建议使用以下方式安装："
@@ -134,41 +134,49 @@ if [ ! -f "main.py" ]; then
 fi
 
 if [ ! -d "core" ] || [ ! -d "video" ] || [ ! -d "gui" ] || [ ! -d "utils" ]; then
-    echo "------------------------------------------------------"
+    echo "-------------------------------------------------------"
     echo -e "\033[31m[错误] 未找到模块目录 core/video/gui/utils\033[0m"
-    echo "------------------------------------------------------"
+    echo "-------------------------------------------------------"
     sleep 5s
     exit 1
 fi
 
 if [ ! -f "ohscrcpy_server" ]; then
-    echo "-----------------------------------------------------------"
+    echo "------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 ohscrcpy_server，请确保该文件存在\033[0m"
-    echo "-----------------------------------------------------------"
+    echo "------------------------------------------------------------"
+    sleep 5s
+    exit 1
+fi
+
+if [ ! -d "HUAWEI" ]; then
+    echo "-------------------------------------------------------"
+    echo -e "\033[31m[错误] 未找到 HUAWEI 目录\033[0m"
+    echo "-------------------------------------------------------"
     sleep 5s
     exit 1
 fi
 
 if [ ! -f "HUAWEI/ohscrcpy_server" ]; then
-    echo "------------------------------------------------------------------"
+    echo "-------------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 HUAWEI/ohscrcpy_server，请确保该文件存在\033[0m"
-    echo "------------------------------------------------------------------"
+    echo "-------------------------------------------------------------------"
     sleep 5s
     exit 1
 fi
 
 if [ ! -f "ohscrcpy_server.cfg" ]; then
-    echo "---------------------------------------------------------------"
+    echo "----------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 ohscrcpy_server.cfg，请确保该文件存在\033[0m"
-    echo "---------------------------------------------------------------"
+    echo "----------------------------------------------------------------"
     sleep 5s
     exit 1
 fi
 
 if [ ! -f "hdc/${OS_NAME}/${ARCH}/hdc" ]; then
-    echo "----------------------------------------------------------------------"
+    echo "-----------------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 hdc/${OS_NAME}/${ARCH}/hdc，请确保该文件存在\033[0m"
-    echo "----------------------------------------------------------------------"
+    echo "-----------------------------------------------------------------------"
     sleep 5s
     exit 1
 fi
@@ -181,9 +189,9 @@ else
 fi
 
 if [ ! -f "hdc/${OS_NAME}/${ARCH}/${LIBUSB_NAME}" ]; then
-    echo "-----------------------------------------------------------------------------------"
+    echo "------------------------------------------------------------------------------------"
     echo -e "\033[33m[警告] 未找到 hdc/${OS_NAME}/${ARCH}/${LIBUSB_NAME}，请确保该文件存在\033[0m"
-    echo "-----------------------------------------------------------------------------------"
+    echo "------------------------------------------------------------------------------------"
     sleep 5s
     exit 1
 fi
@@ -231,21 +239,10 @@ echo "******************************"
 PYINSTALLER_ARGS="--name \"OHScrcpy\" --noconfirm --clean --onefile"
 
 PYINSTALLER_ARGS="${PYINSTALLER_ARGS} \
-    --hidden-import core \
-    --hidden-import core.constants \
-    --hidden-import core.exceptions \
-    --hidden-import core.logger \
-    --hidden-import core.hdc_executor \
-    --hidden-import core.server_manager \
-    --hidden-import core.device_manager \
-    --hidden-import video \
-    --hidden-import video.config \
-    --hidden-import video.decoder \
-    --hidden-import video.stream_client \
-    --hidden-import gui \
-    --hidden-import gui.device_controller \
-    --hidden-import utils \
-    --hidden-import utils.platform_utils"
+    --collect-submodules core \
+    --collect-submodules video \
+    --collect-submodules gui \
+    --collect-submodules utils"
 
 if [ -f "ohscrcpy_server" ]; then
     PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"ohscrcpy_server:.\""
@@ -267,6 +264,10 @@ if [ -f "hdc/${OS_NAME}/${ARCH}/${LIBUSB_NAME}" ]; then
     PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"hdc/${OS_NAME}/${ARCH}/${LIBUSB_NAME}:.\""
 fi
 
+if [ -f "config/log_config.json" ]; then
+    PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --add-data \"config/log_config.json:config\""
+fi
+
 if [ -f "${ICON_FILE}" ]; then
     PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --icon \"${ICON_FILE}\""
 fi
@@ -275,8 +276,8 @@ if [ "${OS_TYPE}" = "macOS" ]; then
     PYINSTALLER_ARGS="${PYINSTALLER_ARGS} --osx-bundle-identifier \"com.openharmony.ohscrcpy\""
 fi
 
-echo "执行命令: pyinstaller main.py ${PYINSTALLER_ARGS}"
-eval "pyinstaller main.py ${PYINSTALLER_ARGS}"
+echo "执行命令: python -m PyInstaller main.py ${PYINSTALLER_ARGS}"
+eval "python -m PyInstaller main.py ${PYINSTALLER_ARGS}"
 
 if [ $? -ne 0 ]; then
     echo "---------------------------------------"

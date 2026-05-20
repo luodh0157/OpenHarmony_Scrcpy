@@ -11,28 +11,6 @@ REM WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 REM See the License for the specific language governing permissions and
 REM limitations under the License.
 
-REM ================================================================================
-REM                OpenHarmony OHScrcpy 自动化构建脚本（Windows平台）
-REM ================================================================================
-REM
-REM 使用前准备：
-REM   1. 将以下文件和目录拷贝到当前目录（Package/Installer）：
-REM      - Client\ohscrcpy_client.py → 重命名为 main.py（或保持原名）
-REM      - Server\bin\rk3568\ohscrcpy_server
-REM      - Server\ohscrcpy_server.cfg
-REM      - Server\bin\harmonyos\ohscrcpy_server → 拷贝到 HUAWEI\ 子目录下
-REM      - Client\hdc\ 目录 → 拷贝整个目录
-REM      - scripts\ 目录 → 拷贝整个目录（包含日志管理脚本）
-REM   2. 确保已安装 Python 3.7+ 和 pip
-REM   3. 运行此脚本：make_ohscrcpy_executer_onedir.bat
-REM
-REM 日志管理脚本包括：
-REM   - fetch_fetch_and_delete_server_logs.bat - 拉取服务端日志脚本
-REM   - delete_fetch_and_delete_server_logs.bat - 删除服务端日志脚本
-REM   - fetch_and_delete_server_logs.bat - 二合一日志管理脚本
-REM
-REM ================================================================================
-
 ::@cls
 @setlocal enabledelayedexpansion
 @chcp 936 >nul
@@ -40,11 +18,18 @@ REM ============================================================================
 
 title OpenHarmony OHScrcpy 打包构建脚本
 color 0a
-echo ===========================================================
-echo      OpenHarmony OHScrcpy 自动化构建脚本（Windows平台）    
-echo ===========================================================
+echo ============================================================
+echo      OpenHarmony OHScrcpy 自动化构建脚本（Windows平台）     
+echo ============================================================
 
-set VERSION=v2.1.0
+REM 获取版本号（优先使用环境变量）
+if not defined VERSION (
+    call "%~dp0..\get_version.bat"
+    if not defined VERSION (
+        echo [警告] 未设置 VERSION 环境变量且未找到 get_version.bat，使用默认版本
+        set VERSION=v2.1.0
+    )
+)
 
 ::PROCESSOR_ARCHITEW6432（仅在 64 位系统的 32 位进程中存在）
 if defined PROCESSOR_ARCHITEW6432 (
@@ -209,7 +194,7 @@ echo *****************************
 echo ******************************
 echo [信息] 开始PyInstaller打包...
 echo ******************************
-pyinstaller .\main.py --name "OHScrcpy" --noconfirm --clean --windowed --console --onedir --hidden-import core --hidden-import core.constants --hidden-import core.exceptions --hidden-import core.logger --hidden-import core.hdc_executor --hidden-import core.server_manager --hidden-import core.device_manager --hidden-import video --hidden-import video.config --hidden-import video.decoder --hidden-import video.stream_client --hidden-import gui --hidden-import gui.main_window --hidden-import utils --hidden-import utils.platform_utils --add-data "ohscrcpy_server:." --add-data "ohscrcpy_server.cfg:." --add-data "HUAWEI\ohscrcpy_server:HUAWEI" --add-data "hdc\Windows\%ARCH%\hdc.exe:." --add-data "hdc\Windows\%ARCH%\libusb_shared.dll:." --icon resources\app.ico
+python -m PyInstaller .\main.py --name "OHScrcpy" --noconfirm --clean --windowed --console --onedir  --collect-submodules core --collect-submodules video --collect-submodules gui --collect-submodules utils --add-data "ohscrcpy_server:." --add-data "ohscrcpy_server.cfg:." --add-data "HUAWEI\ohscrcpy_server:HUAWEI" --add-data "hdc\Windows\%ARCH%\hdc.exe:." --add-data "hdc\Windows\%ARCH%\libusb_shared.dll:." --add-data "config\log_config.json:config" --icon resources\app.ico
 if %errorlevel% neq 0 (
     echo ---------------------------
     echo [错误] PyInstaller打包失败
