@@ -181,9 +181,9 @@ stages:
       - step: release@gitee
         name: release_gitee
         displayName: 版本发布
-        releaseName: ${GITEE_PIPELINE_BUILD_NUMBER}
-        description: 版本发布 ${GITEE_PIPELINE_BUILD_NUMBER}
-        tagName: ${GITEE_PIPELINE_BUILD_NUMBER}
+        releaseName: ${GITEE_TAG_NAME}
+        description: CHANGELOG.txt
+        tagName: ${GITEE_TAG_NAME}
         upstreamArtifact:
           - EXECUTER_ARTIFACT
           - INSTALLER_ARTIFACT
