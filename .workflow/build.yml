@@ -1,17 +1,16 @@
 version: '1.0'
-name: release
-displayName: OHScrcpy版本发布
+name: build
+displayName: OHScrcpy版本构建
 triggers:
   trigger: auto
   push:
     branches:
-      include:
+      precise:
         - main
   pr:
     branches:
-      include:
+      precise:
         - main
-
 stages:
   - name: test-stage
     displayName: OHScrcpy全量测试
