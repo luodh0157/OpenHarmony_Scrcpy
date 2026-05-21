@@ -1,0 +1,87 @@
+version: '1.0'
+name: build-ohos-ohscrcpy
+displayName: OHScrcpy构建打包 (Linux x64)
+triggers:
+  push:
+    branches:
+      include:
+        - main
+        - master
+  pull_request:
+    branches:
+      include:
+        - main
+        - master
+
+stages:
+  - stage:
+      name: test
+      displayName: 运行所有测试
+      steps:
+        - step: build@python
+          name: run-tests
+          displayName: 安装依赖并运行测试
+          pythonVersion: '3.11'
+          commands:
+            - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+            - python3 -m pip install --upgrade pip
+            - pip3 install -r tests/requirements-test.txt
+            - pip3 install -r Client/requirements.txt
+            - pytest tests/ -v --tb=short --cov=Client --cov-report=term-missing
+            - mypy Client/ --ignore-missing-imports --no-error-summary || true
+
+  - stage:
+      name: build-executer
+      displayName: 构建 Executer (Linux x64)
+      steps:
+        - step: build@python
+          name: build-executer
+          displayName: 打包 Executer
+          pythonVersion: '3.11'
+          artifacts:
+            - name: EXECUTER_ARTIFACT
+              path:
+                - Package/Executer/output/Linux/x64/
+          commands:
+            - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+            - python3 -m pip install --upgrade pip
+            - pip3 install -r Client/requirements.txt
+            - pip3 install pyinstaller
+            - cd Package
+            - chmod +x build_executer.sh
+            - ./build_executer.sh
+        - step: publish@general_artifacts
+          name: publish-executer
+          displayName: 上传 Executer 制品
+          dependsOn: build-executer
+          dependArtifact: EXECUTER_ARTIFACT
+          artifactName: OHScrcpy-Executer-Linux-x64
+          artifactRepository: default
+
+  - stage:
+      name: build-installer
+      displayName: 构建 Installer (Linux x64)
+      steps:
+        - step: build@python
+          name: build-installer
+          displayName: 打包 Installer
+          pythonVersion: '3.11'
+          artifacts:
+            - name: INSTALLER_ARTIFACT
+              path:
+                - Package/Installer/output/Linux/x64/
+          commands:
+            - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+            - python3 -m pip install --upgrade pip
+            - pip3 install -r Client/requirements.txt
+            - pip3 install pyinstaller
+            - cd Package
+            - chmod +x build_installer.sh
+            - ./build_installer.sh
+        - step: publish@general_artifacts
+          name: publish-installer
+          displayName: 上传 Installer 制品
+          dependsOn: build-installer
+          dependArtifact: INSTALLER_ARTIFACT
+          artifactName: OHScrcpy-Installer-Linux-x64
+          artifactRepository: default
