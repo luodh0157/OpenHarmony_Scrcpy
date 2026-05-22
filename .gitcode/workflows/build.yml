@@ -1,4 +1,4 @@
-name: Build OpenHarmony OHScrcpy Linux
+name: Build OpenHarmony OHScrcpy Linux x64 (GitCode)
 
 on:
   push:

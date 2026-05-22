@@ -1,6 +1,6 @@
 version: '1.0'
 name: release
-displayName: OHScrcpy版本发布
+displayName: OHScrcpy版本发布 Linux x64 (Gitee)
 triggers:
   trigger: auto
   push:
@@ -181,13 +181,15 @@ stages:
       - step: release@gitee
         name: release_gitee
         displayName: 版本发布
-        releaseName: ${GITEE_TAG_NAME}
-        description: CHANGELOG.txt
-        tagName: ${GITEE_TAG_NAME}
+        releaseName: ${GITEE_BRANCH} # 分支和tag共用一个环境变量
+        description: ${GITEE_BRANCH} 版本发布
+        tagName: ${GITEE_BRANCH}
         upstreamArtifact:
           - EXECUTER_ARTIFACT
           - INSTALLER_ARTIFACT
-        assertFiles: null
+        assertFiles:
+          - Package/Executer/output/Linux/x64/OHScrcpy_Exec_Linux_x64_v2.2.0.zip
+          - Package/Installer/output/Linux/x64/OHScrcpy_Setup_Linux_x64_v2.2.0.zip
         prerelease: false
         allowUpdate: true
         notify: []

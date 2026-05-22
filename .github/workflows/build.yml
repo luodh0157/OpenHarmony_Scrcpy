@@ -1,4 +1,4 @@
-name: Build OpenHarmony OHScrcpy Multi-Platform
+name: Build OpenHarmony OHScrcpy Multi-Platform (GitHub)
 
 on:
   push:

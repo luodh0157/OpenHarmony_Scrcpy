@@ -1,6 +1,6 @@
 version: '1.0'
 name: build
-displayName: OHScrcpy版本构建
+displayName: OHScrcpy版本构建 Linux x64 (Gitee)
 triggers:
   trigger: auto
   push:

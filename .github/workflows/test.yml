@@ -1,4 +1,4 @@
-name: Test OpenHarmony OHScrcpy
+name: Test OpenHarmony OHScrcpy (GitHub)
 
 on:
   workflow_call:
