@@ -188,8 +188,9 @@ stages:
           - EXECUTER_ARTIFACT
           - INSTALLER_ARTIFACT
         assertFiles:
-          - Package/Executer/output/Linux/x64/OHScrcpy_Exec_Linux_x64_v2.2.0.zip
-          - Package/Installer/output/Linux/x64/OHScrcpy_Setup_Linux_x64_v2.2.0.zip
+          - OHScrcpy_*.zip
+          #- OHScrcpy_Exec_Linux_x64_${OHSCRCPY_VERSION}.zip
+          #- OHScrcpy_Setup_Linux_x64_${OHSCRCPY_VERSION}.zip
         prerelease: false
         allowUpdate: true
         notify: []
