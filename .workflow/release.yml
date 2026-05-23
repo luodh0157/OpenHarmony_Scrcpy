@@ -1,6 +1,6 @@
 version: '1.0'
 name: release
-displayName: OHScrcpy版本发布 Linux x64 (Gitee)
+displayName: OHScrcpy版本发布-Linux_x64-Gitee
 triggers:
   trigger: auto
   push:
@@ -17,7 +17,7 @@ stages:
       - step: build@python
         name: test-all
         displayName: 运行所有测试
-        pythonVersion: '3.12'
+        pythonVersion: '3.11'
         commands:
           - curl -L -o Miniforge3-Linux-x86_64.sh "https://mirrors.tuna.tsinghua.edu.cn/github-release/conda-forge/miniforge/LatestRelease/Miniforge3-Linux-x86_64.sh"
           - bash Miniforge3-Linux-x86_64.sh -b -p $HOME/miniforge3
@@ -56,8 +56,8 @@ stages:
     steps:
       - step: build@python
         name: build-executer
-        displayName: 构建 Executer
-        pythonVersion: '3.12'
+        displayName: 构建Executer
+        pythonVersion: '3.11'
         commands:
           - curl -L -o Miniforge3-Linux-x86_64.sh "https://mirrors.tuna.tsinghua.edu.cn/github-release/conda-forge/miniforge/LatestRelease/Miniforge3-Linux-x86_64.sh"
           - bash Miniforge3-Linux-x86_64.sh -b -p $HOME/miniforge3
@@ -94,7 +94,7 @@ stages:
           retry: '0'
       - step: publish@general_artifacts
         name: publish-executer
-        displayName: 上传 Executer 制品
+        displayName: 上传Executer制品
         dependArtifact: EXECUTER_ARTIFACT
         artifactName: OHScrcpy-Executer-Linux-x64
         notify: []
@@ -103,8 +103,8 @@ stages:
         dependsOn: build-executer
       - step: build@python
         name: build-installer
-        displayName: 构建 Installer
-        pythonVersion: '3.12'
+        displayName: 构建Installer
+        pythonVersion: '3.11'
         commands:
           - curl -L -o Miniforge3-Linux-x86_64.sh "https://mirrors.tuna.tsinghua.edu.cn/github-release/conda-forge/miniforge/LatestRelease/Miniforge3-Linux-x86_64.sh"
           - bash Miniforge3-Linux-x86_64.sh -b -p $HOME/miniforge3
@@ -141,7 +141,7 @@ stages:
           retry: '0'
       - step: publish@general_artifacts
         name: publish-installer
-        displayName: 上传 Installer 制品
+        displayName: 上传Installer制品
         dependArtifact: INSTALLER_ARTIFACT
         artifactName: OHScrcpy-Installer-Linux-x64
         notify: []
