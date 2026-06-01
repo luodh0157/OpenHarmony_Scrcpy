@@ -58,6 +58,7 @@ class VideoDecoder:
         self.waiting_for_keyframe: bool = False
         self.last_extradata_hash: Optional[str] = None
         self.keyframe_decode_failed: bool = False
+        self.is_first_frame = True
         
         print_log(LogLevel.INFO, self.log_title, f"创建解码器实例: {config.width}x{config.height}, codec: {config.codec}")
 
@@ -92,7 +93,7 @@ class VideoDecoder:
                 except Exception as e:
                     print_log(LogLevel.ERROR, self.log_title, f"设置extradata失败: {e}")
             
-            print_log(LogLevel.INFO, self.log_title, f"CodecContext初始化成功: {codec_type}, {self.codec_ctx.width}x{self.codec_ctx.height}")
+            print_log(LogLevel.INFO, self.log_title, f"CodecContext初始化结果: {codec_type}, {self.codec_ctx.width}x{self.codec_ctx.height}")
             return True
             
         except Exception as e:
@@ -256,12 +257,21 @@ class VideoDecoder:
                 if packet is not None:
                     try:
                         frames = self.codec_ctx.decode(packet)
-                        
                         for frame in frames:
                             if isinstance(frame, av.VideoFrame):
-                                rgb_array = frame.to_ndarray(format='rgb24')
+                                if self.is_first_frame:
+                                    print_log(LogLevel.INFO, self.log_title, f"解码帧: {frame.width}x{frame.height}, format={frame.format.name}")
+                                    for i, plane in enumerate(frame.planes):
+                                        print_log(LogLevel.INFO, self.log_title, f" plane[{i}] line_size={plane.line_size}, buffer_size={plane.buffer_size}")
                                 
+                                rgb_array = frame.to_ndarray(format='rgb24')
                                 if rgb_array is not None:
+                                    if self.is_first_frame:
+                                        self.is_first_frame = False
+                                        print_log(LogLevel.INFO, self.log_title, f"RGB数组: shape={rgb_array.shape}, dtype={rgb_array.dtype}")
+                                        print_log(LogLevel.INFO, self.log_title, f"RGB数组 strides: {rgb_array.strides}")
+                                        print_log(LogLevel.INFO, self.log_title, f"colorspace={frame.colorspace}, color_range={frame.color_range}")
+                                    
                                     self.decode_success += 1
                                     self.consecutive_errors = 0
                                     self.keyframe_decode_failed = False
@@ -269,6 +279,7 @@ class VideoDecoder:
                                     decoded_frame = rgb_array
                                     break
                     except Exception as decode_error:
+                        print_log(LogLevel.ERROR, self.log_title, f"decode失败: {decode_error}")
                         self.consecutive_errors += 1
                         self.decode_failure += 1
             
@@ -311,6 +322,7 @@ class VideoDecoder:
         self.keyframe_decode_failed = False
         self.last_extradata_hash = None
         self.consecutive_errors = 0
+        self.is_first_frame = True
 
 
 __all__ = ["VideoDecoder"]

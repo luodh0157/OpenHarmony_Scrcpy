@@ -32,10 +32,12 @@
 namespace OHScrcpy {
 
 struct CaptureConfig {
-    int width;
-    int height;
-    int fps;
+    int32_t width;
+    int32_t height;
+    int32_t fps;
+    int32_t bitrate;
     uint64_t displayId;
+    std::string codec;  // "h264" or "h265"
 };
 
 /**

@@ -64,8 +64,8 @@ ErrorCode CaptureWrapper::Init(const CaptureConfig& config) {
     };
     
     OH_VideoEncInfo videoEncInfo = {
-        .videoCodec = OH_H264,
-        .videoBitrate = 1500000,
+        .videoCodec = config.codec == "h265" ? OH_H265 : OH_H264,
+        .videoBitrate = config.bitrate,
         .videoFrameRate = config.fps
     };
     

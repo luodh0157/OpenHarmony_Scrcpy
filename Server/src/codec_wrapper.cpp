@@ -18,6 +18,14 @@
 #include "logger.h"
 
 #include <cstring>
+#include <iostream>
+
+#include <native_avcodec_videoencoder.h>
+#include <native_avcodec_base.h>
+#include <native_avformat.h>
+#include <native_avbuffer.h>
+#include <native_avcapability.h>
+#include <native_buffer.h>
 
 const std::string LOG_TAG = "Codec";
 
@@ -27,7 +35,8 @@ CodecWrapper::CodecWrapper()
     : encoder_(nullptr)
     , surface_(nullptr)
     , is_created_(false)
-    , is_started_(false) {
+    , is_started_(false)
+    , is_first_frame_(true) {
 }
 
 CodecWrapper::~CodecWrapper() {
@@ -142,6 +151,7 @@ ErrorCode CodecWrapper::Start() {
     }
     
     is_started_ = true;
+    is_first_frame_ = true;
     LOG_INFO(LOG_TAG, "VideoEncoder started");
     return ErrorCode::SUCCESS;
 }
@@ -159,6 +169,7 @@ ErrorCode CodecWrapper::Stop() {
     }
     
     is_started_ = false;
+    is_first_frame_ = true;
     LOG_INFO(LOG_TAG, "VideoEncoder stopped");
     return ErrorCode::SUCCESS;
 }
@@ -176,6 +187,13 @@ ErrorCode CodecWrapper::Destroy() {
     
     is_created_ = false;
     return ErrorCode::SUCCESS;
+}
+
+bool CodecWrapper::IsFirstFrame() const {
+    return is_first_frame_;
+}
+void CodecWrapper::ClearIsFirstFrame() {
+    is_first_frame_ = false;
 }
 
 OHNativeWindow* CodecWrapper::GetSurface() {
@@ -205,11 +223,38 @@ void CodecWrapper::OnStreamChanged(OH_AVCodec* codec, OH_AVFormat* format, void*
 }
 
 void CodecWrapper::OnNeedInputBuffer(OH_AVCodec* codec, uint32_t index, OH_AVBuffer* buffer, void* userData) {
+    CodecWrapper* self = static_cast<CodecWrapper*>(userData);
+    if (self) {
+        // 获取视频宽跨距、高跨距
+        if (self->IsFirstFrame()) {
+            auto format = std::shared_ptr<OH_AVFormat>(OH_VideoEncoder_GetInputDescription(codec), OH_AVFormat_Destroy);
+            if (format != nullptr) {
+                int32_t widthStride = 0;
+                int32_t heightStride = 0;
+                OH_AVFormat_GetIntValue(format.get(), OH_MD_KEY_VIDEO_STRIDE, &widthStride);
+                OH_AVFormat_GetIntValue(format.get(), OH_MD_KEY_VIDEO_SLICE_HEIGHT, &heightStride);
+                LOG_INFO(LOG_TAG, "VideoEncoder Input stride info: " + std::to_string(widthStride) + ", " + std::to_string(heightStride));
+            }
+            self->ClearIsFirstFrame();
+        }
+    }
 }
 
 void CodecWrapper::OnNewOutputBuffer(OH_AVCodec* codec, uint32_t index, OH_AVBuffer* buffer, void* userData) {
     CodecWrapper* self = static_cast<CodecWrapper*>(userData);
     if (self) {
+        // 获取视频宽跨距、高跨距
+        if (self->IsFirstFrame()) {
+            auto format = std::shared_ptr<OH_AVFormat>(OH_VideoEncoder_GetOutputDescription(codec), OH_AVFormat_Destroy);
+            if (format != nullptr) {
+                int32_t widthStride = 0;
+                int32_t heightStride = 0;
+                OH_AVFormat_GetIntValue(format.get(), OH_MD_KEY_VIDEO_STRIDE, &widthStride);
+                OH_AVFormat_GetIntValue(format.get(), OH_MD_KEY_VIDEO_SLICE_HEIGHT, &heightStride);
+                LOG_INFO(LOG_TAG, "VideoEncoder Output stride info: " + std::to_string(widthStride) + ", " + std::to_string(heightStride));
+            }
+            self->ClearIsFirstFrame();
+        }
         self->HandleOutputBuffer(index, buffer);
         OH_VideoEncoder_FreeOutputBuffer(codec, index);
     }
@@ -342,4 +387,135 @@ void CodecWrapper::ParseParameterSets(uint8_t* data, size_t size) {
     }
 }
 
+void CodecWrapper::printVideoCodecCapability(const std::string &codec, int32_t width, int32_t height) {
+    const char *codecName = nullptr;
+    const char *codecTitle = nullptr;
+    if (codec == "h265") {
+        codecName = OH_AVCODEC_MIMETYPE_VIDEO_HEVC;
+        codecTitle = "HEVC(H.265)";
+    } else if (codec == "h264") {
+        codecName = OH_AVCODEC_MIMETYPE_VIDEO_AVC;
+        codecTitle = "AVC(H.264)";
+    } else {
+        std::cerr << "Unsupported video codec name: " << codec << std::endl;
+        return;
+    }
+
+    std::cout << "------------------------------------------------------" << std::endl;
+    std::cout << codecTitle << " Video Codec Capability Info: " << std::endl;
+    OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(codecName, true, HARDWARE);
+    if (capability == nullptr) {
+        std::cerr << "OH_AVCodec_GetCapabilityByCategory fail" << std::endl;
+        return;
+    }
+    // 获取编码器名称
+    codecName = OH_AVCapability_GetName(capability);
+    std::cout << "  CodecName: " << codecName << std::endl;
+
+    bool isSupported = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_CBR);
+    bool isSupported2 = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_VBR);
+    bool isSupported3 = OH_AVCapability_IsEncoderBitrateModeSupported(capability, BITRATE_MODE_CQ);
+    std::cout << "  BitRateModeSupported: CBR[" << isSupported << "], VBR[" << isSupported2 << "], CQ[" 
+                << isSupported3 << "]" << std::endl;
+
+    // 获取码率范围
+    OH_AVRange bitrateRange = {-1, -1};
+    int32_t ret = OH_AVCapability_GetEncoderBitrateRange(capability, &bitrateRange);
+    if (ret == AV_ERR_OK) {
+        std::cout << "  BitRateRange: [" << bitrateRange.minVal << "~" << bitrateRange.maxVal << "]";
+    }
+    // 获取CQ模式下的质量范围
+    OH_AVRange qualityRange = {-1, -1};
+    ret = OH_AVCapability_GetEncoderQualityRange(capability, &qualityRange);
+    if (ret == AV_ERR_OK) {
+        std::cout << ", QualityRange: [" << qualityRange.minVal << "~" << qualityRange.maxVal << "]" << std::endl;
+    }
+
+    // 获取profile范围
+    const int32_t *profiles = nullptr;
+    uint32_t profileNum = 0;
+    ret = OH_AVCapability_GetSupportedProfiles(capability, &profiles, &profileNum);
+    if (ret == AV_ERR_OK) {
+        std::cout << "  SupportedProfiles: [";
+        for (uint32_t i = 0; i < profileNum; i++) {
+            std::cout << profiles[i];
+            if (i < profileNum - 1) std::cout << ",";
+        }
+        std::cout << "]" << std::endl;
+    }
+
+    // 获取AVC_PROFILE_MAIN对应的Level范围
+    int32_t profile = OH_AVCProfile::AVC_PROFILE_MAIN;
+    const int32_t *levels = nullptr;
+    uint32_t levelNum = 0;
+    ret = OH_AVCapability_GetSupportedLevelsForProfile(capability, profile, &levels, &levelNum);
+    if (ret == AV_ERR_OK) {
+        std::cout << "  SupportedLevelsForProfile " << profile << "(main): [";
+        for (uint32_t i = 1; i < levelNum; i++) {
+            std::cout << levels[i];
+            if (i < levelNum - 1) std::cout << ",";
+        }
+        std::cout << "]" << std::endl;
+    }
+
+    // 获取支持的宽范围
+    OH_AVRange widthRange = {-1, -1};
+    ret = OH_AVCapability_GetVideoWidthRange(capability, &widthRange);
+    if (ret == AV_ERR_OK) {
+        std::cout << "  WidthRange: [" << widthRange.minVal << "," << widthRange.maxVal << "]";
+    }
+    // 获取支持的高范围
+    OH_AVRange heightRange = {-1, -1};
+    ret = OH_AVCapability_GetVideoHeightRange(capability, &heightRange);
+    if (ret == AV_ERR_OK) {
+        std::cout << ", HeightRange: [" << heightRange.minVal << "," << heightRange.maxVal << "]";
+    }
+    // 获取支持的帧率范围
+    OH_AVRange frameRateRange = {-1, -1};
+    ret = OH_AVCapability_GetVideoFrameRateRange(capability, &frameRateRange);
+    if (ret == AV_ERR_OK) {
+        std::cout << ", FrameRateRange: [" << frameRateRange.minVal << "," << frameRateRange.maxVal << "]" << std::endl;
+    }
+
+    // 获取宽对齐要求
+    int32_t widthAlignment = 0;
+    ret = OH_AVCapability_GetVideoWidthAlignment(capability, &widthAlignment);
+    if (ret == AV_ERR_OK) {
+        std::cout << "  WidthAlignment: " << widthAlignment;
+    }
+    // 获取高对齐要求
+    int32_t heightAlignment = 0;
+    ret = OH_AVCapability_GetVideoHeightAlignment(capability, &heightAlignment);
+    if (ret == AV_ERR_OK) {
+        std::cout << ", HeightAlignment: " << heightAlignment << std::endl;
+    }
+
+    // 获取支持的像素格式
+    const int32_t *pixFormats = nullptr;
+    uint32_t pixFormatNum = 0;
+    ret = OH_AVCapability_GetVideoSupportedPixelFormats(capability, &pixFormats, &pixFormatNum);
+    if (ret == AV_ERR_OK) {
+        std::cout << "  SupportedPixelFormats: [";
+        for (uint32_t i = 1; i < pixFormatNum; i++) {
+            std::cout << pixFormats[i];
+            if (i < pixFormatNum - 1) std::cout << ",";
+        }
+        std::cout << "]" << std::endl;
+    }
+    // 获取是否支持低时延特性
+    isSupported = OH_AVCapability_IsFeatureSupported(capability, VIDEO_LOW_LATENCY);
+    std::cout << "  IsFeatureSupported VIDEO_LOW_LATENCY: " << isSupported << std::endl;
+
+    // 获取指定视频宽高是否支持
+    isSupported = OH_AVCapability_IsVideoSizeSupported(capability, width, height);
+    std::cout << "  [" << width << "*" << height << "] IsVideoSizeSupported: " << isSupported;
+    // 获取指定视频尺寸支持的帧率范围
+    frameRateRange = {-1, -1};
+    ret = OH_AVCapability_GetVideoFrameRateRangeForSize(capability, width, height, &frameRateRange);
+    if (ret == AV_ERR_OK) {
+        std::cout << ", FrameRateRange: [" << frameRateRange.minVal << "," << frameRateRange.maxVal << "]" << std::endl;
+    }
+
+    std::cout << "------------------------------------------------------" << std::endl;
+}
 } // namespace OHScrcpy

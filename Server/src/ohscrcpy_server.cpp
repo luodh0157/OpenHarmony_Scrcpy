@@ -617,9 +617,6 @@ public:
     }
 };
 
-
-
-
 class OHScrcpyServer;
 
 // 流传输上下文（用于管理编码数据发送）
@@ -854,6 +851,7 @@ public:
         
         double ratio = (double)newPixels / origPixels;
         int64_t newBitrate = (int64_t)(originalBitrate * ratio);
+        LOG_INFO(LOG_TAG, "  originalBitrate: " + std::to_string(originalBitrate) + ", newBitrate: " + std::to_string(newBitrate));
         
         if (newBitrate < 500000) newBitrate = 500000;
         if (newBitrate > originalBitrate * 2) newBitrate = originalBitrate * 2;
@@ -861,40 +859,38 @@ public:
         return newBitrate;
     }
     
-void applyCodecConfig(ScreenInfo& screenInfo, const StandardResolution& res, 
-                          int64_t origBitrate, int32_t origWidth, int32_t origHeight,
-                          const std::string& codec) {
+    void applyCodecConfig(ScreenInfo& screenInfo, const StandardResolution& res, const std::string& codec) {
+        int32_t bitrate = adjustBitrateByResolution(screenInfo.bitrate, screenInfo.width, screenInfo.height,
+                                                    res.width, res.height);
         screenInfo.width = res.width;
         screenInfo.height = res.height;
         screenInfo.codec = codec;
-        screenInfo.bitrate = adjustBitrateByResolution(origBitrate, origWidth, origHeight,
-                                                       screenInfo.width, screenInfo.height);
+        screenInfo.bitrate = bitrate;
     }
     
     void applyDefaultConfig(ScreenInfo& screenInfo) {
         screenInfo.width = 720;
         screenInfo.height = 1280;
         screenInfo.codec = "h264";
-        screenInfo.bitrate = 2000000;
+        screenInfo.bitrate = DEFAULT_BITRATE;
     }
     
-    bool selectCodecAndResolution(ScreenInfo& screenInfo, int32_t origWidth, int32_t origHeight,
-                                      int32_t origFps, int64_t origBitrate) {
+    bool selectCodecAndResolution(ScreenInfo& screenInfo) {
         bool hasHevc = checkHevcEncoderExists();
         
         if (hasHevc) {
             LOG_INFO(LOG_TAG, "[Step 2] Check if H.265 supports original resolution");
-            if (checkHevcSizeAndFrameRateSupported(origWidth, origHeight, origFps)) {
+            if (checkHevcSizeAndFrameRateSupported(screenInfo.width, screenInfo.height, screenInfo.fps)) {
                 LOG_INFO(LOG_TAG, "  H.265 supports original resolution, using H.265 directly");
                 screenInfo.codec = "h265";
                 return true;
             }
             
             LOG_INFO(LOG_TAG, "[Step 3] Find H.265 supported resolution from standard list");
-            StandardResolution hevcRes = findCodecSupportedResolution("h265", origWidth, origHeight, origFps);
+            StandardResolution hevcRes = findCodecSupportedResolution("h265", screenInfo.width, screenInfo.height, screenInfo.fps);
             if (hevcRes.name != "none") {
                 LOG_INFO(LOG_TAG, "  Found H.265 supported resolution, using H.265");
-                applyCodecConfig(screenInfo, hevcRes, origBitrate, origWidth, origHeight, "h265");
+                applyCodecConfig(screenInfo, hevcRes, "h265");
                 return true;
             }
             
@@ -903,10 +899,10 @@ void applyCodecConfig(ScreenInfo& screenInfo, const StandardResolution& res,
             LOG_INFO(LOG_TAG, "[Step 2] No H.265 encoder, using H.264");
         }
         
-        StandardResolution avcRes = findCodecSupportedResolution("h264", origWidth, origHeight, origFps);
+        StandardResolution avcRes = findCodecSupportedResolution("h264", screenInfo.width, screenInfo.height, screenInfo.fps);
         if (avcRes.name != "none") {
             LOG_INFO(LOG_TAG, "  Found H.264 supported resolution, using H.264");
-            applyCodecConfig(screenInfo, avcRes, origBitrate, origWidth, origHeight, "h264");
+            applyCodecConfig(screenInfo, avcRes, "h264");
             return true;
         }
         
@@ -923,19 +919,19 @@ private:
             return false;
         }
 
+        printScreenDetailsInfo();
         ScreenInfo screenInfo;
         if (!getPrimaryScreenInfo(screenInfo)) {
             LOG_ERROR(LOG_TAG, "Get primary screen info fail");
             return false;
         }
         
-		selectCodecAndResolution(screenInfo, screenInfo.width, screenInfo.height,
-                                 screenInfo.fps, screenInfo.bitrate);
-
+		selectCodecAndResolution(screenInfo);
         screen_info_ = screenInfo;
         LOG_INFO(LOG_TAG, "------------------------------------------------------");
         LOG_INFO(LOG_TAG, "Final config: " + std::to_string(screen_info_.width) + "x" + std::to_string(screen_info_.height) + "@" + std::to_string(screen_info_.fps) + "fps, codec=" + screen_info_.codec + ", bitrate=" + std::to_string(screen_info_.bitrate) + "bps");
 		LOG_INFO(LOG_TAG, "------------------------------------------------------");
+        encoder_.printVideoCodecCapability(screenInfo.codec, screenInfo.width, screenInfo.height);
         return true;
     }
 
@@ -1021,6 +1017,8 @@ private:
         captureConfig.height = screen_info_.height;
         captureConfig.fps = screen_info_.fps;
         captureConfig.displayId = screen_info_.displayid;
+        captureConfig.bitrate = screen_info_.bitrate;
+        captureConfig.codec = screen_info_.codec;
         
         ret = capturer_.Create();
         if (ret != ErrorCode::SUCCESS) {

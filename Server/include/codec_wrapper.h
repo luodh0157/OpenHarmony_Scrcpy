@@ -33,10 +33,10 @@
 namespace OHScrcpy {
 
 struct CodecConfig {
-    int width;
-    int height;
-    int fps;
-    int bitrate;
+    int32_t width;
+    int32_t height;
+    int32_t fps;
+    int32_t bitrate;
     std::string codec;  // "h264" or "h265"
 };
 
@@ -54,7 +54,7 @@ struct CodecConfig {
 class CodecWrapper {
 public:
     using OnOutputCallback = std::function<void(uint8_t* data, size_t size, bool isKeyframe)>;
-    
+
     CodecWrapper();
     ~CodecWrapper();
     
@@ -65,6 +65,9 @@ public:
     
     OHNativeWindow* GetSurface();
     bool IsReady() const;
+    bool IsFirstFrame() const;
+    void ClearIsFirstFrame();
+    void printVideoCodecCapability(const std::string &codec, int32_t width, int32_t height);
     
     void SetOutputCallback(OnOutputCallback callback);
     
@@ -97,6 +100,7 @@ private:
     
     bool is_created_;
     bool is_started_;
+    bool is_first_frame_;
 };
 
 } // namespace OHScrcpy
