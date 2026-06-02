@@ -1,6 +1,6 @@
 version: '1.0'
 name: release
-displayName: OHScrcpy版本发布-Linux_x64-Gitee
+displayName: OHScrcpy版本发布
 triggers:
   trigger: auto
   push:

@@ -1,16 +1,12 @@
 version: '1.0'
 name: build
-displayName: OHScrcpy版本构建-Linux_x64-Gitee
+displayName: OHScrcpy版本构建
 triggers:
   trigger: auto
   push:
-    branches:
-      precise:
-        - main
-  pr:
-    branches:
-      precise:
-        - main
+    tags:
+      prefix:
+        - OpenHarmony_Scrcpy_V
 stages:
   - name: test-stage
     displayName: OHScrcpy全量测试
