@@ -7,6 +7,8 @@ triggers:
     tags:
       prefix:
         - OpenHarmony_Scrcpy_V
+variables:
+  OHSCRCPY_VERSION: v2.2.0
 stages:
   - name: test-stage
     displayName: OHScrcpy全量测试
@@ -188,9 +190,8 @@ stages:
           - EXECUTER_ARTIFACT
           - INSTALLER_ARTIFACT
         assertFiles:
-          - OHScrcpy_*.zip
-          #- OHScrcpy_Exec_Linux_x64_${OHSCRCPY_VERSION}.zip
-          #- OHScrcpy_Setup_Linux_x64_${OHSCRCPY_VERSION}.zip
+          - OHScrcpy_Exec_Linux_x64_${OHSCRCPY_VERSION}.zip
+          - OHScrcpy_Setup_Linux_x64_${OHSCRCPY_VERSION}.zip
         prerelease: false
         allowUpdate: true
         notify: []
