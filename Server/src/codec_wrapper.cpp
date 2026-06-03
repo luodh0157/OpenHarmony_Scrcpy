@@ -390,12 +390,15 @@ void CodecWrapper::ParseParameterSets(uint8_t* data, size_t size) {
 void CodecWrapper::printVideoCodecCapability(const std::string &codec, int32_t width, int32_t height) {
     const char *codecName = nullptr;
     const char *codecTitle = nullptr;
+    int32_t profile = -1;
     if (codec == "h265") {
         codecName = OH_AVCODEC_MIMETYPE_VIDEO_HEVC;
         codecTitle = "HEVC(H.265)";
+        profile = OH_HEVCProfile::HEVC_PROFILE_MAIN;
     } else if (codec == "h264") {
         codecName = OH_AVCODEC_MIMETYPE_VIDEO_AVC;
         codecTitle = "AVC(H.264)";
+        profile = OH_AVCProfile::AVC_PROFILE_MAIN;
     } else {
         std::cerr << "Unsupported video codec name: " << codec << std::endl;
         return;
@@ -444,8 +447,7 @@ void CodecWrapper::printVideoCodecCapability(const std::string &codec, int32_t w
         std::cout << "]" << std::endl;
     }
 
-    // 获取AVC_PROFILE_MAIN对应的Level范围
-    int32_t profile = OH_AVCProfile::AVC_PROFILE_MAIN;
+    // 获取PROFILE_MAIN对应的Level范围
     const int32_t *levels = nullptr;
     uint32_t levelNum = 0;
     ret = OH_AVCapability_GetSupportedLevelsForProfile(capability, profile, &levels, &levelNum);
