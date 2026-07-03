@@ -21,6 +21,7 @@
 #include "error_codes.h"
 
 #include <iostream>
+#include <sstream>
 #include <thread>
 #include <atomic>
 #include <memory>
