@@ -78,7 +78,7 @@
 #define LOG_FILE_PREFIX "/data/local/tmp/server_"
 
 // 版本信息
-#define VERSION "v2.1"
+#define VERSION "v2.3"
 
 // H.264 NALU类型
 enum H264NaluType {
