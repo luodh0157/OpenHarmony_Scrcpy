@@ -264,7 +264,8 @@ class VideoDecoder:
                                     for i, plane in enumerate(frame.planes):
                                         print_log(LogLevel.INFO, self.log_title, f" plane[{i}] line_size={plane.line_size}, buffer_size={plane.buffer_size}")
                                 
-                                rgb_array = frame.to_ndarray(format='rgb24')
+                                # rgb_array = frame.to_ndarray(format='rgb24')
+                                rgb_array = frame.to_ndarray(width=self.config.width, height=self.config.height, format='rgb24')
                                 if rgb_array is not None:
                                     if self.is_first_frame:
                                         self.is_first_frame = False

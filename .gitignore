@@ -13,3 +13,6 @@ AGENTS.md
 # BUILD
 Package/Executer/output/
 Package/Installer/output/
+
+# LOG
+logs/
